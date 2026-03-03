@@ -24,9 +24,10 @@ class WhiskyCmd {
         let whiskyCmdURL = Bundle.main.url(forResource: "WhiskyCmd", withExtension: nil)
 
         if let whiskyCmdURL = whiskyCmdURL {
+            let escapedPath = whiskyCmdURL.path(percentEncoded: false).replacingOccurrences(of: "'", with: "'\\''")
             // swiftlint:disable line_length
             let script = """
-            do shell script "ln -fs \(whiskyCmdURL.path(percentEncoded: false)) /usr/local/bin/whisky" with administrator privileges
+            do shell script "ln -fs '\(escapedPath)' /usr/local/bin/whisky" with administrator privileges
             """
             // swiftlint:enable line_length
 

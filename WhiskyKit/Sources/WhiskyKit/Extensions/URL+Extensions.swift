@@ -36,9 +36,10 @@ extension URL {
     }
 
     public func prettyPath() -> String {
+        let displayName = (Bundle.main.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String) ?? "Whisky"
         var prettyPath = path(percentEncoded: false)
         prettyPath = prettyPath
-            .replacingOccurrences(of: Bundle.main.bundleIdentifier ?? Bundle.whiskyBundleIdentifier, with: "Whisky")
+            .replacingOccurrences(of: Bundle.main.bundleIdentifier ?? Bundle.whiskyBundleIdentifier, with: displayName)
             .replacingOccurrences(of: "/Users/\(NSUserName())", with: "~")
         return prettyPath
     }

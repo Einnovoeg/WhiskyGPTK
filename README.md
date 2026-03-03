@@ -1,15 +1,15 @@
 <div align="center">
 
-  # Whisky 🥃 
-  *Wine but a bit stronger*
+  # Whisky 🥃
+  *Modern Wine + GPTK wrapper for macOS*
   
   ![](https://img.shields.io/github/actions/workflow/status/IsaacMarovitz/Whisky/SwiftLint.yml?style=for-the-badge)
   [![](https://img.shields.io/discord/1115955071549702235?style=for-the-badge)](https://discord.gg/CsqAfs9CnM)
 </div>
 
-## Maintenance Notice
+## Fork Status
 
-[Whisky is no longer actively maintained](https://docs.getwhisky.app/maintenance-notice). Apps and games may break at any time.
+This fork modernizes the original project with maintained runtime sources and refreshed UI polish.
 
 <img width="650" alt="Config" src="https://github.com/Whisky-App/Whisky/assets/42140194/d0a405e8-76ee-48f0-92b5-165d184a576b">
 
@@ -27,7 +27,9 @@ Debug and profile with ease
 
 ---
 
-Whisky provides a clean and easy to use graphical wrapper for Wine built in native SwiftUI. You can make and manage bottles, install and run Windows apps and games, and unlock the full potential of your Mac with no technical knowledge required. Whisky is built on top of CrossOver 22.1.1, and Apple's own `Game Porting Toolkit`.
+Whisky provides a clean and easy-to-use graphical wrapper for Wine built in native SwiftUI. You can make and manage bottles, install and run Windows apps and games, and unlock the full potential of your Mac with no technical knowledge required.
+
+This fork now resolves runtime packages from maintained sources, prioritizing the latest releases from [Gcenx/game-porting-toolkit](https://github.com/Gcenx/game-porting-toolkit) and falling back to legacy archives when needed.
 
 Translated on [Crowdin](https://crowdin.com/project/whisky).
 
@@ -37,10 +39,9 @@ Translated on [Crowdin](https://crowdin.com/project/whisky).
 - CPU: Apple Silicon (M-series chips)
 - OS: macOS Sonoma 14.0 or later
 
-## Homebrew
+## Installation
 
-Whisky is on homebrew! Install with 
-`brew install --cask whisky`.
+Build from source in Xcode for now. Homebrew instructions from upstream may point to the archived build.
 
 ## My game isn't working!
 
@@ -59,7 +60,8 @@ Whisky is possible thanks to the magic of several projects:
 - [SemanticVersion](https://github.com/SwiftPackageIndex/SemanticVersion) by SwiftPackageIndex
 - [swift-argument-parser](https://github.com/apple/swift-argument-parser) by Apple
 - [SwiftTextTable](https://github.com/scottrhoyt/SwiftyTextTable) by scottrhoyt
-- [CrossOver 22.1.1](https://www.codeweavers.com/crossover) by CodeWeavers and WineHQ
+- [Game Porting Toolkit releases](https://github.com/Gcenx/game-porting-toolkit) by Gcenx
+- [CrossOver](https://www.codeweavers.com/crossover) by CodeWeavers and WineHQ
 - D3DMetal by Apple
 
 Special thanks to Gcenx, ohaiibuzzle, and Nat Brown for their support and contributions!
@@ -75,7 +77,7 @@ Special thanks to Gcenx, ohaiibuzzle, and Nat Brown for their support and contri
         </picture>
     </td>
     <td>
-        Whisky doesn't exist without CrossOver. Support the work of CodeWeavers using our <a href="https://www.codeweavers.com/store?ad=1010">affiliate link</a>.
+        Whisky wouldn't exist without CrossOver. Support the work of CodeWeavers using our <a href="https://www.codeweavers.com/store?ad=1010">affiliate link</a>.
     </td>
   </tr>
 </table>

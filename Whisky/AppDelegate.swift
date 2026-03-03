@@ -56,11 +56,18 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         Bundle.main.resourceURL?.deletingLastPathComponent().deletingLastPathComponent()
     }
 
-    private static let expectedUrl = URL(fileURLWithPath: "/Applications/Whisky.app")
+    private static var expectedURL: URL {
+        URL(fileURLWithPath: "/Applications")
+            .appending(path: Bundle.main.bundleURL.lastPathComponent)
+    }
+
+    private static var appDisplayName: String {
+        (Bundle.main.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String) ?? "Whisky"
+    }
 
     private static var insideAppsFolder: Bool {
         if let url = appUrl {
-            return url.path.contains("Xcode") || url.path.contains(expectedUrl.path)
+            return url.path.contains("Xcode") || url.path.contains(expectedURL.path)
         }
         return false
     }
@@ -68,8 +75,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     @MainActor
     private func showAlertOnFirstLaunch() {
         let alert = NSAlert()
-        alert.messageText = String(localized: "showAlertOnFirstLaunch.messageText")
-        alert.informativeText = String(localized: "showAlertOnFirstLaunch.informativeText")
+        alert.messageText = localizedStringWithDisplayName("showAlertOnFirstLaunch.messageText")
+        alert.informativeText = localizedStringWithDisplayName("showAlertOnFirstLaunch.informativeText")
         alert.addButton(withTitle: String(localized: "showAlertOnFirstLaunch.button.moveToApplications"))
         alert.addButton(withTitle: String(localized: "showAlertOnFirstLaunch.button.dontMove"))
 
@@ -79,11 +86,17 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             let appURL = Bundle.main.bundleURL
 
             do {
-                _ = try FileManager.default.replaceItemAt(AppDelegate.expectedUrl, withItemAt: appURL)
-                NSWorkspace.shared.open(AppDelegate.expectedUrl)
+                _ = try FileManager.default.replaceItemAt(AppDelegate.expectedURL, withItemAt: appURL)
+                NSWorkspace.shared.open(AppDelegate.expectedURL)
             } catch {
                 print("Failed to move the app: \(error)")
             }
         }
+    }
+
+    private func localizedStringWithDisplayName(_ key: String) -> String {
+        String(localized: String.LocalizationValue(key))
+            .replacingOccurrences(of: "Whisky", with: AppDelegate.appDisplayName)
+            .replacingOccurrences(of: "Whiskey", with: AppDelegate.appDisplayName)
     }
 }

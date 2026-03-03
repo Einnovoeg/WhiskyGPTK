@@ -62,6 +62,7 @@ struct PinView: View {
             .frame(width: 45, height: 45)
             .padding(EdgeInsets(top: 0, leading: 0, bottom: 12, trailing: 0))
         }
+        .whiskyGlassCard(cornerRadius: 16)
         .contextMenu {
             ProgramMenuView(program: program, path: $path)
 
