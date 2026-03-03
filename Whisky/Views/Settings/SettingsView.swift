@@ -23,6 +23,9 @@ struct SettingsView: View {
     @AppStorage("SUEnableAutomaticChecks") var whiskyUpdate = true
     @AppStorage("killOnTerminate") var killOnTerminate = true
     @AppStorage("checkWhiskyWineUpdates") var checkWhiskyWineUpdates = true
+    @AppStorage("autoInstallWhiskyWineUpdates") var autoInstallWhiskyWineUpdates = true
+    @AppStorage("preferLocalGPTKRuntime") var preferLocalGPTKRuntime = true
+    @AppStorage("useGlassUI") var useGlassUI = false
     @AppStorage("defaultBottleLocation") var defaultBottleLocation = BottleData.defaultBottleDir
     private let hasAppUpdateFeed: Bool = {
         guard let feedURL = Bundle.main.object(forInfoDictionaryKey: "SUFeedURL") as? String else {
@@ -30,6 +33,17 @@ struct SettingsView: View {
         }
         return !feedURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }()
+    private var runtimeSummary: String {
+        let version = WhiskyWineInstaller.whiskyWineVersion().map(String.init) ?? String(
+            localized: "settings.runtime.notInstalled",
+            defaultValue: "Not installed"
+        )
+        let source = WhiskyWineInstaller.runtimeSource() ?? String(
+            localized: "settings.runtime.unknownSource",
+            defaultValue: "Unknown source"
+        )
+        return "\(version) · \(source)"
+    }
 
     var body: some View {
         Form {
@@ -53,6 +67,14 @@ struct SettingsView: View {
                     }
                 }
             }
+            Section {
+                Toggle(
+                    String(localized: "settings.toggle.glass", defaultValue: "Use glass effects"),
+                    isOn: $useGlassUI
+                )
+            } header: {
+                Text(String(localized: "settings.appearance", defaultValue: "Appearance"))
+            }
             Section("settings.updates") {
                 if hasAppUpdateFeed {
                     Toggle("settings.toggle.whisky.updates", isOn: $whiskyUpdate)
@@ -63,6 +85,28 @@ struct SettingsView: View {
                         .foregroundStyle(.secondary)
                 }
                 Toggle("settings.toggle.whiskywine.updates", isOn: $checkWhiskyWineUpdates)
+                Toggle(
+                    String(localized: "settings.toggle.whiskywine.autoInstall",
+                           defaultValue: "Automatically install runtime updates"),
+                    isOn: $autoInstallWhiskyWineUpdates
+                )
+                .disabled(!checkWhiskyWineUpdates)
+                Toggle(
+                    String(localized: "settings.toggle.runtime.preferLocal",
+                           defaultValue: "Prefer local mounted GPTK runtime"),
+                    isOn: $preferLocalGPTKRuntime
+                )
+                Text(
+                    String(
+                        format: String(
+                            localized: "settings.runtime.installed",
+                            defaultValue: "Installed Runtime: %@"
+                        ),
+                        runtimeSummary
+                    )
+                )
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
         }
         .formStyle(.grouped)

@@ -24,6 +24,8 @@ import SemanticVersion
 struct ContentView: View {
     @AppStorage("selectedBottleURL") private var selectedBottleURL: URL?
     @AppStorage("checkWhiskyWineUpdates") private var checkWhiskyWineUpdates = true
+    @AppStorage("autoInstallWhiskyWineUpdates") private var autoInstallWhiskyWineUpdates = true
+    @AppStorage("useGlassUI") private var useGlassUI = false
     @EnvironmentObject var bottleVM: BottleVM
     @Binding var showSetup: Bool
 
@@ -111,6 +113,12 @@ struct ContentView: View {
                 }
                 let updateInfo = await task.value
                 if updateInfo.0 {
+                    if autoInstallWhiskyWineUpdates {
+                        WhiskyWineInstaller.uninstall()
+                        showSetup = true
+                        return
+                    }
+
                     let alert = NSAlert()
                     alert.messageText = String(localized: "update.whiskywine.title")
                     alert.informativeText = String(
@@ -160,7 +168,7 @@ struct ContentView: View {
             .animation(.default, value: bottleFilter)
             .listStyle(.sidebar)
             .searchable(text: $bottleFilter, placement: .sidebar)
-            .scrollContentBackground(.hidden)
+            .scrollContentBackground(useGlassUI ? .hidden : .automatic)
             .onChange(of: newlyCreatedBottleURL) { _, url in
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
                     selected = url

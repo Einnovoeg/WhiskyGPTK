@@ -26,6 +26,7 @@ enum SetupStage {
 }
 
 struct SetupView: View {
+    @AppStorage("useGlassUI") private var useGlassUI = false
     @State private var path: [SetupStage] = []
     @State var tarLocation: URL = URL(fileURLWithPath: "")
     @State private var runtimeVersion: SemanticVersion?
@@ -63,10 +64,10 @@ struct SetupView: View {
                         }
                     }
             }
-            .frame(width: 440, height: 280)
+            .frame(width: useGlassUI ? 440 : nil, height: useGlassUI ? 280 : nil)
             .whiskyGlassCard(cornerRadius: 24)
         }
-        .padding(20)
+        .padding(useGlassUI ? 20 : 8)
         .whiskyWindowBackground()
         .interactiveDismissDisabled()
     }

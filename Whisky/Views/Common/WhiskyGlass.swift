@@ -29,54 +29,62 @@ extension View {
 }
 
 private struct WhiskyWindowBackground: ViewModifier {
+    @AppStorage("useGlassUI") private var useGlassUI = false
+
     func body(content: Content) -> some View {
-        content
-            .background {
-                ZStack {
-                    // Modern "Glass" base
-                    Rectangle()
-                        .fill(.regularMaterial)
+        if useGlassUI {
+            content
+                .background {
+                    ZStack {
+                        Rectangle()
+                            .fill(.regularMaterial)
+                            .ignoresSafeArea()
+
+                        LinearGradient(
+                            colors: [
+                                Color.clear,
+                                Color.accentColor.opacity(0.15)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
                         .ignoresSafeArea()
 
-                    // Subtle gradient overlay for depth
-                    LinearGradient(
-                        colors: [
-                            Color.clear,
-                            Color.accentColor.opacity(0.15)
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                    .ignoresSafeArea()
+                        Circle()
+                            .fill(Color.white.opacity(0.15))
+                            .frame(width: 400, height: 400)
+                            .blur(radius: 60)
+                            .offset(x: -180, y: -140)
 
-                    // Atmospheric orbs
-                    Circle()
-                        .fill(Color.white.opacity(0.15))
-                        .frame(width: 400, height: 400)
-                        .blur(radius: 60)
-                        .offset(x: -180, y: -140)
-
-                    Circle()
-                        .fill(Color.accentColor.opacity(0.20))
-                        .frame(width: 350, height: 350)
-                        .blur(radius: 60)
-                        .offset(x: 200, y: 160)
+                        Circle()
+                            .fill(Color.accentColor.opacity(0.20))
+                            .frame(width: 350, height: 350)
+                            .blur(radius: 60)
+                            .offset(x: 200, y: 160)
+                    }
                 }
-            }
+        } else {
+            content
+        }
     }
 }
 
 private struct WhiskyGlassCard: ViewModifier {
+    @AppStorage("useGlassUI") private var useGlassUI = false
     let cornerRadius: CGFloat
 
     func body(content: Content) -> some View {
-        content
-            .padding(16)
-            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
-            .overlay {
-                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .strokeBorder(Color.white.opacity(0.20), lineWidth: 1)
-            }
-            .shadow(color: .black.opacity(0.12), radius: 18, x: 0, y: 10)
+        if useGlassUI {
+            content
+                .padding(16)
+                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+                .overlay {
+                    RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                        .strokeBorder(Color.white.opacity(0.20), lineWidth: 1)
+                }
+                .shadow(color: .black.opacity(0.12), radius: 18, x: 0, y: 10)
+        } else {
+            content
+        }
     }
 }

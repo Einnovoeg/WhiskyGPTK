@@ -156,7 +156,7 @@ public class WhiskyWineInstaller {
     }
 
     public static func latestRuntimePackage() async -> RuntimePackage? {
-        if let package = localRuntimePackage() {
+        if prefersLocalRuntime(), let package = localRuntimePackage() {
             return package
         }
         if let package = await fetchLatestGPTKPackage() {
@@ -453,6 +453,13 @@ public class WhiskyWineInstaller {
             return false
         }
         return url.path.hasPrefix(fileManager.temporaryDirectory.path)
+    }
+
+    private static func prefersLocalRuntime() -> Bool {
+        if let preference = UserDefaults.standard.object(forKey: "preferLocalGPTKRuntime") as? Bool {
+            return preference
+        }
+        return true
     }
 
     private static func preserveRuntimeExtrasIfNeeded(from source: URL, to destination: URL) throws {

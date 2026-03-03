@@ -27,6 +27,7 @@ enum BottleStage {
 }
 
 struct BottleView: View {
+    @AppStorage("useGlassUI") private var useGlassUI = false
     @ObservedObject var bottle: Bottle
     @State private var path = NavigationPath()
     @State private var programLoading: Bool = false
@@ -59,9 +60,9 @@ struct BottleView: View {
                 }
                 .formStyle(.grouped)
                 .scrollDisabled(true)
-                .scrollContentBackground(.hidden)
+                .scrollContentBackground(useGlassUI ? .hidden : .automatic)
             }
-            .scrollContentBackground(.hidden)
+            .scrollContentBackground(useGlassUI ? .hidden : .automatic)
             .bottomBar {
                 HStack {
                     Spacer()

@@ -27,21 +27,27 @@ extension View {
 }
 
 private struct BottomBarViewModifier<BarContent>: ViewModifier where BarContent: View {
+    @AppStorage("useGlassUI") private var useGlassUI = false
     var barContent: BarContent
 
     func body(content: Content) -> some View {
         content
             .safeAreaInset(edge: .bottom, spacing: 0) {
                 VStack(spacing: 0) {
-                    Rectangle()
-                        .fill(.separator)
-                        .frame(height: 1)
+                    if useGlassUI {
+                        Rectangle()
+                            .fill(.separator)
+                            .frame(height: 1)
 
-                    barContent
-                        .padding(.vertical, 12)
-                        .padding(.horizontal, 20)
+                        barContent
+                            .padding(.vertical, 12)
+                            .padding(.horizontal, 20)
+                    } else {
+                        Divider()
+                        barContent
+                    }
                 }
-                .background(.bar)
+                .background(useGlassUI ? AnyShapeStyle(.bar) : AnyShapeStyle(.regularMaterial))
                 .buttonStyle(BottomBarButtonStyle())
             }
     }
