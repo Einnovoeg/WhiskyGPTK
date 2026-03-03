@@ -20,6 +20,34 @@ import Foundation
 
 public extension Bundle {
     static var whiskyBundleIdentifier: String {
-        return Bundle.main.bundleIdentifier ?? "com.isaacmarovitz.Whisky"
+        if let environmentOverride = ProcessInfo.processInfo.environment["WHISKY_BUNDLE_ID_OVERRIDE"]?
+            .trimmingCharacters(in: .whitespacesAndNewlines),
+           !environmentOverride.isEmpty {
+            return environmentOverride
+        }
+
+        let currentIdentifier = Bundle.main.bundleIdentifier ?? "com.isaacmarovitz.Whisky"
+        if hasStoredData(for: currentIdentifier) {
+            return currentIdentifier
+        }
+
+        let alternates = ["com.isaacmarovitz.Whisky", "com.isaacmarovitz.WhiskyGPTK"]
+            .filter { $0 != currentIdentifier }
+        for candidate in alternates where hasStoredData(for: candidate) {
+            return candidate
+        }
+
+        return currentIdentifier
+    }
+
+    private static func hasStoredData(for bundleIdentifier: String) -> Bool {
+        let fileManager = FileManager.default
+        let appSupport = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+        let containers = fileManager.homeDirectoryForCurrentUser
+            .appending(path: "Library")
+            .appending(path: "Containers")
+
+        return fileManager.fileExists(atPath: appSupport.appending(path: bundleIdentifier).path)
+            || fileManager.fileExists(atPath: containers.appending(path: bundleIdentifier).path)
     }
 }

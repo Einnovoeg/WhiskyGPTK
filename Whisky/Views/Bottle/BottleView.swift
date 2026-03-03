@@ -59,7 +59,9 @@ struct BottleView: View {
                 }
                 .formStyle(.grouped)
                 .scrollDisabled(true)
+                .scrollContentBackground(.hidden)
             }
+            .scrollContentBackground(.hidden)
             .bottomBar {
                 HStack {
                     Spacer()
@@ -72,6 +74,7 @@ struct BottleView: View {
                     Button("button.winetricks") {
                         showWinetricksSheet.toggle()
                     }
+                    .disabled(!WhiskyWineInstaller.hasWinetricksRuntime())
                     Button("button.run") {
                         let panel = NSOpenPanel()
                         panel.allowsMultipleSelection = false

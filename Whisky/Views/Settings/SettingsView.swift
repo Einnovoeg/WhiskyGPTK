@@ -24,6 +24,12 @@ struct SettingsView: View {
     @AppStorage("killOnTerminate") var killOnTerminate = true
     @AppStorage("checkWhiskyWineUpdates") var checkWhiskyWineUpdates = true
     @AppStorage("defaultBottleLocation") var defaultBottleLocation = BottleData.defaultBottleDir
+    private let hasAppUpdateFeed: Bool = {
+        guard let feedURL = Bundle.main.object(forInfoDictionaryKey: "SUFeedURL") as? String else {
+            return false
+        }
+        return !feedURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }()
 
     var body: some View {
         Form {
@@ -48,7 +54,14 @@ struct SettingsView: View {
                 }
             }
             Section("settings.updates") {
-                Toggle("settings.toggle.whisky.updates", isOn: $whiskyUpdate)
+                if hasAppUpdateFeed {
+                    Toggle("settings.toggle.whisky.updates", isOn: $whiskyUpdate)
+                } else {
+                    Text(String(localized: "settings.appfeed.unconfigured",
+                                defaultValue: "App update feed is not configured for this build."))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
                 Toggle("settings.toggle.whiskywine.updates", isOn: $checkWhiskyWineUpdates)
             }
         }

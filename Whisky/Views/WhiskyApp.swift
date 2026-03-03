@@ -25,12 +25,20 @@ struct WhiskyApp: App {
     @State var showSetup: Bool = false
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     @Environment(\.openURL) var openURL
-    private let updaterController: SPUStandardUpdaterController
+    private let updaterController: SPUStandardUpdaterController?
 
     init() {
-        updaterController = SPUStandardUpdaterController(startingUpdater: true,
-                                                         updaterDelegate: nil,
-                                                         userDriverDelegate: nil)
+        let feedURL = Bundle.main.object(forInfoDictionaryKey: "SUFeedURL") as? String
+        if let feedURL = feedURL?.trimmingCharacters(in: .whitespacesAndNewlines),
+           !feedURL.isEmpty {
+            updaterController = SPUStandardUpdaterController(
+                startingUpdater: true,
+                updaterDelegate: nil,
+                userDriverDelegate: nil
+            )
+        } else {
+            updaterController = nil
+        }
     }
 
     var body: some Scene {
@@ -50,7 +58,9 @@ struct WhiskyApp: App {
         .handlesExternalEvents(matching: ["{same path of URL?}"])
         .commands {
             CommandGroup(after: .appInfo) {
-                SparkleView(updater: updaterController.updater)
+                if let updater = updaterController?.updater {
+                    SparkleView(updater: updater)
+                }
             }
             CommandGroup(before: .systemServices) {
                 Divider()
@@ -104,6 +114,11 @@ struct WhiskyApp: App {
                 }
                 Button("help.github") {
                     if let url = URL(string: "https://github.com/Whisky-App/Whisky") {
+                        openURL(url)
+                    }
+                }
+                Button("Game Porting Toolkit Releases") {
+                    if let url = URL(string: "https://github.com/Gcenx/game-porting-toolkit/releases") {
                         openURL(url)
                     }
                 }

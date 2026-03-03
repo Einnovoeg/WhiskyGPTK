@@ -100,7 +100,7 @@ public class Wine {
     public static func runProgram(
         at url: URL, args: [String] = [], bottle: Bottle, environment: [String: String] = [:]
     ) async throws {
-        if bottle.settings.dxvk {
+        if bottle.settings.dxvk && WhiskyWineInstaller.hasDXVKRuntime() {
             try enableDXVK(bottle: bottle)
         }
 
@@ -235,6 +235,12 @@ public class Wine {
             "GST_DEBUG": "1"
         ]
         bottle.settings.environmentVariables(wineEnv: &result)
+        if !WhiskyWineInstaller.hasDXVKRuntime() {
+            // Runtime packages from GPTK may omit DXVK; strip DXVK-specific overrides to avoid launch failures.
+            result.removeValue(forKey: "WINEDLLOVERRIDES")
+            result.removeValue(forKey: "DXVK_HUD")
+            result.removeValue(forKey: "DXVK_ASYNC")
+        }
         guard !environment.isEmpty else { return result }
         result.merge(environment, uniquingKeysWith: { $1 })
         return result

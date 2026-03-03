@@ -17,6 +17,7 @@
 //
 
 import SwiftUI
+import SemanticVersion
 
 enum SetupStage {
     case rosetta
@@ -27,11 +28,14 @@ enum SetupStage {
 struct SetupView: View {
     @State private var path: [SetupStage] = []
     @State var tarLocation: URL = URL(fileURLWithPath: "")
+    @State private var runtimeVersion: SemanticVersion?
+    @State private var runtimeSource: String = "Unknown"
+    @State private var runtimeReleaseName: String?
     @Binding var showSetup: Bool
     var firstTime: Bool = true
 
     var body: some View {
-        VStack {
+        ZStack {
             NavigationStack(path: $path) {
                 WelcomeView(path: $path, showSetup: $showSetup, firstTime: firstTime)
                     .navigationBarBackButtonHidden(true)
@@ -40,14 +44,30 @@ struct SetupView: View {
                         case .rosetta:
                             RosettaView(path: $path, showSetup: $showSetup)
                         case .whiskyWineDownload:
-                            WhiskyWineDownloadView(tarLocation: $tarLocation, path: $path)
+                            WhiskyWineDownloadView(
+                                tarLocation: $tarLocation,
+                                runtimeVersion: $runtimeVersion,
+                                runtimeSource: $runtimeSource,
+                                runtimeReleaseName: $runtimeReleaseName,
+                                path: $path
+                            )
                         case .whiskyWineInstall:
-                            WhiskyWineInstallView(tarLocation: $tarLocation, path: $path, showSetup: $showSetup)
+                            WhiskyWineInstallView(
+                                tarLocation: $tarLocation,
+                                runtimeVersion: $runtimeVersion,
+                                runtimeSource: $runtimeSource,
+                                runtimeReleaseName: $runtimeReleaseName,
+                                path: $path,
+                                showSetup: $showSetup
+                            )
                         }
                     }
             }
+            .frame(width: 440, height: 280)
+            .whiskyGlassCard(cornerRadius: 24)
         }
-        .padding()
+        .padding(20)
+        .whiskyWindowBackground()
         .interactiveDismissDisabled()
     }
 }

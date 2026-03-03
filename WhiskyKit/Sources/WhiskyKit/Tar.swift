@@ -47,7 +47,8 @@ public class Tar {
         let pipe = Pipe()
 
         process.executableURL = tarBinary
-        process.arguments = ["-xzf", "\(tarBall.path)", "-C", "\(toURL.path)"]
+        // Auto-detect compression so both .tar.gz and .tar.xz archives work.
+        process.arguments = ["-xf", "\(tarBall.path)", "-C", "\(toURL.path)"]
         process.standardOutput = pipe
         process.standardError = pipe
 

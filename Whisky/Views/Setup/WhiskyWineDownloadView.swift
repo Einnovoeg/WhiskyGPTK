@@ -18,16 +18,23 @@
 
 import SwiftUI
 import WhiskyKit
+import SemanticVersion
 
 struct WhiskyWineDownloadView: View {
     @State private var fractionProgress: Double = 0
     @State private var completedBytes: Int64 = 0
     @State private var totalBytes: Int64 = 0
     @State private var downloadSpeed: Double = 0
+    @State private var downloadError: String?
     @State private var downloadTask: URLSessionDownloadTask?
     @State private var observation: NSKeyValueObservation?
     @State private var startTime: Date?
+    @State private var releaseLabel: String = "Resolving latest runtime package..."
+    @State private var resolvedDownloadURL: URL?
     @Binding var tarLocation: URL
+    @Binding var runtimeVersion: SemanticVersion?
+    @Binding var runtimeSource: String
+    @Binding var runtimeReleaseName: String?
     @Binding var path: [SetupStage]
     var body: some View {
         VStack {
@@ -38,6 +45,14 @@ struct WhiskyWineDownloadView: View {
                 Text("setup.whiskywine.download.subtitle")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
+                Text(releaseLabel)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                if let downloadError {
+                    Text(downloadError)
+                        .font(.caption)
+                        .foregroundStyle(.red)
+                }
                 Spacer()
                 VStack {
                     ProgressView(value: fractionProgress, total: 1)
@@ -58,6 +73,17 @@ struct WhiskyWineDownloadView: View {
                     }
                 }
                 .padding(.horizontal)
+                if downloadError != nil {
+                    Button(String(localized: "button.retry", defaultValue: "Retry")) {
+                        guard let resolvedDownloadURL else { return }
+                        downloadError = nil
+                        fractionProgress = 0
+                        completedBytes = 0
+                        totalBytes = 0
+                        downloadSpeed = 0
+                        startDownload(from: resolvedDownloadURL)
+                    }
+                }
                 Spacer()
             }
             Spacer()
@@ -65,36 +91,61 @@ struct WhiskyWineDownloadView: View {
         .frame(width: 400, height: 200)
         .onAppear {
             Task {
-                if let url: URL = URL(string: "https://data.getwhisky.app/Wine/Libraries.tar.gz") {
-                    downloadTask = URLSession(configuration: .ephemeral).downloadTask(with: url) { url, _, _ in
-                        Task.detached {
-                            await MainActor.run {
-                                if let url = url {
-                                    tarLocation = url
-                                    proceed()
-                                }
-                            }
-                        }
+                let package = await WhiskyWineInstaller.latestRuntimePackage()
+                runtimeVersion = package?.version
+                runtimeSource = package?.source ?? "Whisky Legacy Runtime"
+                runtimeReleaseName = package?.releaseName
+                releaseLabel = package.map { "\($0.releaseName) via \($0.source)" } ?? "Using legacy runtime source"
+
+                let downloadURL = package?.downloadURL ?? WhiskyWineInstaller.legacyRuntimeDownloadURL()
+                resolvedDownloadURL = downloadURL
+                startDownload(from: downloadURL)
+            }
+        }
+        .onDisappear {
+            observation?.invalidate()
+            downloadTask?.cancel()
+        }
+    }
+
+    private func startDownload(from url: URL) {
+        if url.isFileURL {
+            tarLocation = url
+            proceed()
+            return
+        }
+
+        observation?.invalidate()
+        downloadTask?.cancel()
+        downloadTask = URLSession(configuration: .ephemeral).downloadTask(with: url) { url, _, _ in
+            Task.detached {
+                await MainActor.run {
+                    if let url = url {
+                        tarLocation = url
+                        proceed()
+                    } else {
+                        downloadError = String(localized: "setup.whiskywine.download.error",
+                                               defaultValue: "Runtime download failed.")
                     }
-                    observation = downloadTask?.observe(\.countOfBytesReceived) { task, _ in
-                        Task {
-                            await MainActor.run {
-                                let currentTime = Date()
-                                let elapsedTime = currentTime.timeIntervalSince(startTime ?? currentTime)
-                                if completedBytes > 0 {
-                                    downloadSpeed = Double(completedBytes) / elapsedTime
-                                }
-                                totalBytes = task.countOfBytesExpectedToReceive
-                                completedBytes = task.countOfBytesReceived
-                                fractionProgress = Double(completedBytes) / Double(totalBytes)
-                            }
-                        }
-                    }
-                    startTime = Date()
-                    downloadTask?.resume()
                 }
             }
         }
+        observation = downloadTask?.observe(\.countOfBytesReceived) { task, _ in
+            Task {
+                await MainActor.run {
+                    let currentTime = Date()
+                    let elapsedTime = currentTime.timeIntervalSince(startTime ?? currentTime)
+                    if completedBytes > 0 {
+                        downloadSpeed = Double(completedBytes) / elapsedTime
+                    }
+                    totalBytes = task.countOfBytesExpectedToReceive
+                    completedBytes = task.countOfBytesReceived
+                    fractionProgress = totalBytes > 0 ? Double(completedBytes) / Double(totalBytes) : 0
+                }
+            }
+        }
+        startTime = Date()
+        downloadTask?.resume()
     }
 
     func formatBytes(bytes: Int64) -> String {

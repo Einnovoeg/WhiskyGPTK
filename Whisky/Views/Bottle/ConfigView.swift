@@ -118,20 +118,31 @@ struct ConfigView: View {
                 }
             }
             Section("config.title.dxvk", isExpanded: $dxvkSectionExpanded) {
+                if !WhiskyWineInstaller.hasDXVKRuntime() {
+                    Text(
+                        String(
+                            localized: "config.dxvk.unavailable",
+                            defaultValue: "DXVK is unavailable in the installed runtime package."
+                        )
+                    )
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
                 Toggle(isOn: $bottle.settings.dxvk) {
                     Text("config.dxvk")
                 }
+                .disabled(!WhiskyWineInstaller.hasDXVKRuntime())
                 Toggle(isOn: $bottle.settings.dxvkAsync) {
                     Text("config.dxvk.async")
                 }
-                .disabled(!bottle.settings.dxvk)
+                .disabled(!WhiskyWineInstaller.hasDXVKRuntime() || !bottle.settings.dxvk)
                 Picker("config.dxvkHud", selection: $bottle.settings.dxvkHud) {
                     Text("config.dxvkHud.full").tag(DXVKHUD.full)
                     Text("config.dxvkHud.partial").tag(DXVKHUD.partial)
                     Text("config.dxvkHud.fps").tag(DXVKHUD.fps)
                     Text("config.dxvkHud.off").tag(DXVKHUD.off)
                 }
-                .disabled(!bottle.settings.dxvk)
+                .disabled(!WhiskyWineInstaller.hasDXVKRuntime() || !bottle.settings.dxvk)
             }
             Section("config.title.metal", isExpanded: $metalSectionExpanded) {
                 Toggle(isOn: $bottle.settings.metalHud) {
