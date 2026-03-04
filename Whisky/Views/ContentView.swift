@@ -20,6 +20,7 @@ import SwiftUI
 import UniformTypeIdentifiers
 import WhiskyKit
 import SemanticVersion
+import Foundation
 
 struct ContentView: View {
     @AppStorage("selectedBottleURL") private var selectedBottleURL: URL?
@@ -114,8 +115,7 @@ struct ContentView: View {
                 let updateInfo = await task.value
                 if updateInfo.0 {
                     if autoInstallWhiskyWineUpdates {
-                        WhiskyWineInstaller.uninstall()
-                        showSetup = true
+                        await installLatestRuntimeUpdate()
                         return
                     }
 
@@ -217,6 +217,40 @@ struct ContentView: View {
             bottleVM.bottles
                 .filter { $0.settings.name.localizedCaseInsensitiveContains(bottleFilter) }
                 .sorted()
+        }
+    }
+
+    @MainActor
+    private func installLatestRuntimeUpdate() async {
+        guard let package = await WhiskyWineInstaller.latestRuntimePackage() else {
+            return
+        }
+
+        let archiveURL: URL
+        if package.downloadURL.isFileURL {
+            archiveURL = package.downloadURL
+        } else {
+            do {
+                let (downloadedURL, _) = try await URLSession(configuration: .ephemeral)
+                    .download(from: package.downloadURL)
+                archiveURL = downloadedURL
+            } catch {
+                print("Failed to download runtime update: \(error)")
+                return
+            }
+        }
+
+        let installed = await Task.detached(priority: .userInitiated) {
+            WhiskyWineInstaller.install(
+                from: archiveURL,
+                versionOverride: package.version,
+                source: package.source,
+                releaseName: package.releaseName
+            )
+        }.value
+
+        if !installed {
+            print("Failed to install runtime update.")
         }
     }
 }
