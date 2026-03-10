@@ -162,12 +162,19 @@ public class WhiskyWineInstaller {
     }
 
     public static func latestRuntimePackage() async -> RuntimePackage? {
-        if prefersLocalRuntime(), let package = localRuntimePackage() {
-            return package
+        let localPackage = prefersLocalRuntime() ? localRuntimePackage() : nil
+
+        if let remotePackage = await fetchLatestGPTKPackage() {
+            if let localPackage {
+                return localPackage.version >= remotePackage.version ? localPackage : remotePackage
+            }
+            return remotePackage
         }
-        if let package = await fetchLatestGPTKPackage() {
-            return package
+
+        if let localPackage {
+            return localPackage
         }
+
         return await fetchLegacyPackage()
     }
 
