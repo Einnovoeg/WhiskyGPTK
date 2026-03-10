@@ -30,6 +30,8 @@ struct WelcomeView: View {
     var body: some View {
         VStack {
             VStack {
+                WhiskyBrandIcon(size: 72)
+                    .padding(.bottom, 6)
                 if firstTime {
                     Text("setup.welcome")
                         .font(.title)

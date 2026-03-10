@@ -226,6 +226,9 @@ struct ContentView: View {
                 VStack(alignment: .leading, spacing: 6) {
                     Text("Whisky")
                         .font(.system(size: 30, weight: .bold, design: .rounded))
+                    Text("Bottled Windows compatibility for macOS")
+                        .font(.headline)
+                        .foregroundStyle(WhiskyBrandPalette.gold)
                     Text(currentRuntimeLabel)
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
@@ -234,29 +237,45 @@ struct ContentView: View {
 
                 Spacer()
 
-                Image(systemName: "wineglass.fill")
-                    .font(.system(size: 26, weight: .semibold))
-                    .foregroundStyle(.pink.gradient)
-                    .padding(14)
-                    .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+                WhiskyBrandIcon(size: 72)
             }
 
-            FlowLayout(spacing: 8) {
-                WhiskyGlassBadge(
-                    icon: "shippingbox.fill",
-                    title: "\(bottleVM.bottles.count) Bottles",
-                    tint: .orange
-                )
-                WhiskyGlassBadge(
-                    icon: "bolt.fill",
-                    title: "\(bottleVM.countActive()) Active",
-                    tint: .green
-                )
-                WhiskyGlassBadge(
-                    icon: "arrow.down.circle",
-                    title: runtimeBadgeLabel,
-                    tint: .blue
-                )
+            ViewThatFits {
+                HStack(spacing: 8) {
+                    WhiskyGlassBadge(
+                        icon: "shippingbox.fill",
+                        title: "\(bottleVM.bottles.count) Bottles",
+                        tint: .orange
+                    )
+                    WhiskyGlassBadge(
+                        icon: "bolt.fill",
+                        title: "\(bottleVM.countActive()) Active",
+                        tint: .green
+                    )
+                    WhiskyGlassBadge(
+                        icon: "arrow.down.circle",
+                        title: runtimeBadgeLabel,
+                        tint: .blue
+                    )
+                }
+
+                VStack(alignment: .leading, spacing: 8) {
+                    WhiskyGlassBadge(
+                        icon: "shippingbox.fill",
+                        title: "\(bottleVM.bottles.count) Bottles",
+                        tint: .orange
+                    )
+                    WhiskyGlassBadge(
+                        icon: "bolt.fill",
+                        title: "\(bottleVM.countActive()) Active",
+                        tint: .green
+                    )
+                    WhiskyGlassBadge(
+                        icon: "arrow.down.circle",
+                        title: runtimeBadgeLabel,
+                        tint: .blue
+                    )
+                }
             }
 
             HStack(spacing: 10) {
@@ -280,11 +299,7 @@ struct ContentView: View {
 
     private var emptyState: some View {
         VStack(spacing: 18) {
-            Image(systemName: "wineglass")
-                .font(.system(size: 42, weight: .semibold))
-                .foregroundStyle(.pink.gradient)
-                .padding(18)
-                .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+            WhiskyBrandIcon(size: 96)
 
             VStack(spacing: 6) {
                 Text("No Bottles Yet")
@@ -298,7 +313,7 @@ struct ContentView: View {
             FlowLayout(spacing: 8) {
                 WhiskyGlassBadge(icon: "shippingbox", title: "Per-app bottles", tint: .orange)
                 WhiskyGlassBadge(icon: "gamecontroller.fill", title: "GPTK runtime", tint: .blue)
-                WhiskyGlassBadge(icon: "sparkles", title: "Glass UI", tint: .pink)
+                WhiskyGlassBadge(icon: "sparkles", title: "Brand glass UI", tint: WhiskyBrandPalette.amber)
             }
 
             Button {

@@ -153,11 +153,7 @@ struct BottleView: View {
 
                 Spacer()
 
-                Image(systemName: "shippingbox.fill")
-                    .font(.system(size: 24, weight: .semibold))
-                    .foregroundStyle(.orange.gradient)
-                    .padding(14)
-                    .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+                WhiskyBrandIcon(size: 64)
             }
 
             ViewThatFits {

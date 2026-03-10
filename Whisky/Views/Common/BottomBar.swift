@@ -38,7 +38,22 @@ private struct BottomBarViewModifier<BarContent>: ViewModifier where BarContent:
                         barContent
                             .padding(.vertical, 12)
                             .padding(.horizontal, 20)
-                            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+                            .background {
+                                RoundedRectangle(cornerRadius: 24, style: .continuous)
+                                    .fill(.ultraThinMaterial)
+                                    .overlay {
+                                        LinearGradient(
+                                            colors: [
+                                                WhiskyBrandPalette.gold.opacity(0.10),
+                                                Color.clear,
+                                                WhiskyBrandPalette.copper.opacity(0.12)
+                                            ],
+                                            startPoint: .topLeading,
+                                            endPoint: .bottomTrailing
+                                        )
+                                        .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+                                    }
+                            }
                             .overlay {
                                 RoundedRectangle(cornerRadius: 24, style: .continuous)
                                     .strokeBorder(Color.white.opacity(0.18), lineWidth: 1)
