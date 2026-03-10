@@ -25,8 +25,16 @@ struct SettingsView: View {
     @AppStorage("checkWhiskyWineUpdates") var checkWhiskyWineUpdates = true
     @AppStorage("autoInstallWhiskyWineUpdates") var autoInstallWhiskyWineUpdates = true
     @AppStorage("preferLocalGPTKRuntime") var preferLocalGPTKRuntime = true
-    @AppStorage("useGlassUI") var useGlassUI = false
+    @AppStorage("useGlassUI") var useGlassUI = true
     @AppStorage("defaultBottleLocation") var defaultBottleLocation = BottleData.defaultBottleDir
+    @State private var latestRuntimePackage: WhiskyWineInstaller.RuntimePackage?
+    @State private var latestRuntimeSummary = String(
+        localized: "settings.runtime.checking",
+        defaultValue: "Checking latest runtime..."
+    )
+    @State private var runtimeActionMessage: String?
+    @State private var isRefreshingRuntime = false
+    @State private var isInstallingRuntime = false
     private let hasAppUpdateFeed: Bool = {
         guard let feedURL = Bundle.main.object(forInfoDictionaryKey: "SUFeedURL") as? String else {
             return false
@@ -107,11 +115,129 @@ struct SettingsView: View {
                 )
                     .font(.caption)
                     .foregroundStyle(.secondary)
+                Text(
+                    String(
+                        format: String(
+                            localized: "settings.runtime.latest",
+                            defaultValue: "Latest Available: %@"
+                        ),
+                        latestRuntimeSummary
+                    )
+                )
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                if let runtimeActionMessage {
+                    Text(runtimeActionMessage)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                HStack {
+                    Button(
+                        String(
+                            localized: "settings.runtime.checkNow",
+                            defaultValue: "Check Now"
+                        )
+                    ) {
+                        Task {
+                            await refreshLatestRuntime()
+                        }
+                    }
+                    .disabled(isRefreshingRuntime || isInstallingRuntime)
+
+                    Button(isInstallingRuntime
+                           ? String(localized: "settings.runtime.installing", defaultValue: "Installing…")
+                           : String(localized: "settings.runtime.installNow", defaultValue: "Install Latest Runtime")) {
+                        Task {
+                            await installLatestRuntime()
+                        }
+                    }
+                    .disabled(isRefreshingRuntime || isInstallingRuntime || latestRuntimePackage == nil)
+                }
             }
         }
         .formStyle(.grouped)
         .fixedSize(horizontal: false, vertical: true)
         .frame(width: ViewWidth.medium)
+        .task {
+            await refreshLatestRuntime()
+        }
+    }
+
+    @MainActor
+    private func refreshLatestRuntime() async {
+        isRefreshingRuntime = true
+        defer { isRefreshingRuntime = false }
+
+        let package = await WhiskyWineInstaller.latestRuntimePackage()
+        latestRuntimePackage = package
+        latestRuntimeSummary = package.map { "\($0.version) · \($0.source)" } ?? String(
+            localized: "settings.runtime.unavailable",
+            defaultValue: "Unable to resolve latest runtime"
+        )
+    }
+
+    @MainActor
+    private func installLatestRuntime() async {
+        if latestRuntimePackage == nil {
+            await refreshLatestRuntime()
+        }
+
+        guard let package = latestRuntimePackage else {
+            runtimeActionMessage = String(
+                localized: "settings.runtime.installUnavailable",
+                defaultValue: "Runtime download source is unavailable."
+            )
+            return
+        }
+
+        isInstallingRuntime = true
+        runtimeActionMessage = nil
+
+        let archiveURL: URL
+        if package.downloadURL.isFileURL {
+            archiveURL = package.downloadURL
+        } else {
+            do {
+                let (downloadedURL, _) = try await URLSession(configuration: .ephemeral)
+                    .download(from: package.downloadURL)
+                archiveURL = downloadedURL
+            } catch {
+                isInstallingRuntime = false
+                runtimeActionMessage = String(
+                    localized: "settings.runtime.downloadFailed",
+                    defaultValue: "Failed to download the selected runtime."
+                )
+                return
+            }
+        }
+
+        let packageVersion = package.version
+        let packageSource = package.source
+        let packageReleaseName = package.releaseName
+        let success = await withCheckedContinuation { continuation in
+            DispatchQueue.global(qos: .userInitiated).async {
+                let success = WhiskyWineInstaller.install(
+                    from: archiveURL,
+                    versionOverride: packageVersion,
+                    source: packageSource,
+                    releaseName: packageReleaseName
+                )
+                continuation.resume(returning: success)
+            }
+        }
+
+        isInstallingRuntime = false
+        runtimeActionMessage = success
+            ? String(
+                localized: "settings.runtime.installSuccess",
+                defaultValue: "Installed %@."
+            )
+            .replacingOccurrences(of: "%@", with: package.releaseName)
+            : String(
+                localized: "settings.runtime.installFailed",
+                defaultValue: "Runtime installation failed."
+            )
+        await refreshLatestRuntime()
     }
 }
 

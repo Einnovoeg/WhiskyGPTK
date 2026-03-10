@@ -27,7 +27,7 @@ enum BottleStage {
 }
 
 struct BottleView: View {
-    @AppStorage("useGlassUI") private var useGlassUI = false
+    @AppStorage("useGlassUI") private var useGlassUI = true
     @ObservedObject var bottle: Bottle
     @State private var path = NavigationPath()
     @State private var programLoading: Bool = false
@@ -38,29 +38,19 @@ struct BottleView: View {
     var body: some View {
         NavigationStack(path: $path) {
             ScrollView {
-                LazyVGrid(columns: gridLayout, alignment: .center) {
-                    ForEach(bottle.pinnedPrograms, id: \.id) { pinnedProgram in
-                        PinView(
-                            bottle: bottle, program: pinnedProgram.program, pin: pinnedProgram.pin, path: $path
-                        )
+                VStack(alignment: .leading, spacing: useGlassUI ? 20 : 0) {
+                    if useGlassUI {
+                        bottleHero
+                            .padding(.horizontal)
+                            .padding(.top, 20)
                     }
-                    PinAddView(bottle: bottle)
+
+                    pinnedProgramsSection
+                        .padding(.horizontal, useGlassUI ? 16 : 0)
+
+                    navigationLinksSection
+                        .padding(.horizontal, useGlassUI ? 16 : 0)
                 }
-                .padding()
-                Form {
-                    NavigationLink(value: BottleStage.programs) {
-                        Label("tab.programs", systemImage: "list.bullet")
-                    }
-                    NavigationLink(value: BottleStage.config) {
-                        Label("tab.config", systemImage: "gearshape")
-                    }
-//                    NavigationLink(value: BottleStage.processes) {
-//                        Label("tab.processes", systemImage: "hockey.puck.circle")
-//                    }
-                }
-                .formStyle(.grouped)
-                .scrollDisabled(true)
-                .scrollContentBackground(useGlassUI ? .hidden : .automatic)
             }
             .scrollContentBackground(useGlassUI ? .hidden : .automatic)
             .bottomBar {
@@ -146,6 +136,122 @@ struct BottleView: View {
             .navigationDestination(for: Program.self) { program in
                 ProgramView(program: program)
             }
+        }
+    }
+
+    private var bottleHero: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack(alignment: .top, spacing: 16) {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(bottle.settings.name)
+                        .font(.system(size: 30, weight: .bold, design: .rounded))
+                    Text(bottle.url.lastPathComponent)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+
+                Spacer()
+
+                Image(systemName: "shippingbox.fill")
+                    .font(.system(size: 24, weight: .semibold))
+                    .foregroundStyle(.orange.gradient)
+                    .padding(14)
+                    .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+            }
+
+            ViewThatFits {
+                HStack(spacing: 8) {
+                    WhiskyGlassBadge(icon: "desktopcomputer", title: bottle.settings.windowsVersion.pretty(), tint: .blue)
+                    WhiskyGlassBadge(icon: bottle.settings.dxvk ? "bolt.fill" : "sparkles", title: renderLabel, tint: bottle.settings.dxvk ? .orange : .green)
+                    WhiskyGlassBadge(icon: "speedometer", title: syncLabel, tint: .pink)
+                }
+                VStack(alignment: .leading, spacing: 8) {
+                    WhiskyGlassBadge(icon: "desktopcomputer", title: bottle.settings.windowsVersion.pretty(), tint: .blue)
+                    WhiskyGlassBadge(icon: bottle.settings.dxvk ? "bolt.fill" : "sparkles", title: renderLabel, tint: bottle.settings.dxvk ? .orange : .green)
+                    WhiskyGlassBadge(icon: "speedometer", title: syncLabel, tint: .pink)
+                }
+            }
+
+            HStack(spacing: 10) {
+                Button("button.cDrive") {
+                    bottle.openCDrive()
+                }
+                .buttonStyle(.borderedProminent)
+
+                Button("button.terminal") {
+                    bottle.openTerminal()
+                }
+                .buttonStyle(.bordered)
+
+                Button("button.winetricks") {
+                    showWinetricksSheet.toggle()
+                }
+                .buttonStyle(.bordered)
+                .disabled(!WhiskyWineInstaller.hasWinetricksRuntime())
+            }
+        }
+        .whiskyGlassCard(cornerRadius: 30)
+    }
+
+    private var pinnedProgramsSection: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            if useGlassUI {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Quick Launch")
+                        .font(.title3.weight(.semibold))
+                    Text("Pinned apps and shortcuts for this bottle.")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            LazyVGrid(columns: gridLayout, alignment: .center, spacing: 12) {
+                ForEach(bottle.pinnedPrograms, id: \.id) { pinnedProgram in
+                    PinView(
+                        bottle: bottle,
+                        program: pinnedProgram.program,
+                        pin: pinnedProgram.pin,
+                        path: $path
+                    )
+                }
+                PinAddView(bottle: bottle)
+            }
+        }
+        .padding(useGlassUI ? 4 : 0)
+        .whiskyGlassCard(cornerRadius: useGlassUI ? 28 : 0)
+    }
+
+    private var navigationLinksSection: some View {
+        Form {
+            NavigationLink(value: BottleStage.programs) {
+                Label("tab.programs", systemImage: "list.bullet")
+            }
+            NavigationLink(value: BottleStage.config) {
+                Label("tab.config", systemImage: "gearshape")
+            }
+//            NavigationLink(value: BottleStage.processes) {
+//                Label("tab.processes", systemImage: "hockey.puck.circle")
+//            }
+        }
+        .formStyle(.grouped)
+        .scrollDisabled(true)
+        .scrollContentBackground(useGlassUI ? .hidden : .automatic)
+        .whiskyGlassCard(cornerRadius: useGlassUI ? 28 : 0)
+    }
+
+    private var renderLabel: String {
+        bottle.settings.dxvk ? "DXVK Enabled" : "D3DMetal"
+    }
+
+    private var syncLabel: String {
+        switch bottle.settings.enhancedSync {
+        case .none:
+            return "No Sync Boost"
+        case .esync:
+            return "ESync"
+        case .msync:
+            return "MSync"
         }
     }
 

@@ -34,6 +34,12 @@ public class WhiskyWineInstaller {
     private static let latestGPTKReleaseURL = URL(
         string: "https://api.github.com/repos/Gcenx/game-porting-toolkit/releases/latest"
     )!
+    private static let latestGPTKReleasePageURL = URL(
+        string: "https://github.com/Gcenx/game-porting-toolkit/releases/latest"
+    )!
+    private static let latestGPTKReleaseDownloadBaseURL = URL(
+        string: "https://github.com/Gcenx/game-porting-toolkit/releases/download/"
+    )!
     private static let legacyVersionPlistURL = URL(string: "https://data.getwhisky.app/Wine/WhiskyWineVersion.plist")!
     private static let legacyRuntimeArchiveURL = URL(string: "https://data.getwhisky.app/Wine/Libraries.tar.gz")!
     private static let session = URLSession(configuration: .ephemeral)
@@ -215,23 +221,20 @@ public class WhiskyWineInstaller {
         }
 
         let volumesRoot = URL(fileURLWithPath: "/Volumes")
-        guard let volumeURLs = try? FileManager.default.contentsOfDirectory(
+        if let volumeURLs = try? FileManager.default.contentsOfDirectory(
             at: volumesRoot,
             includingPropertiesForKeys: nil,
             options: [.skipsHiddenFiles]
-        ) else {
-            return nil
+        ) {
+            for volumeURL in volumeURLs {
+                for candidate in runtimeCandidates(for: volumeURL) where hasWineBinary(in: candidate) {
+                    return packageForLocalRuntime(at: candidate)
+                }
+            }
         }
 
-        for volumeURL in volumeURLs {
-            let candidate = volumeURL
-                .appending(path: "Game Porting Toolkit.app")
-                .appending(path: "Contents")
-                .appending(path: "Resources")
-                .appending(path: "wine")
-            if hasWineBinary(in: candidate) {
-                return packageForLocalRuntime(at: candidate)
-            }
+        if let discoveredRuntime = discoverNestedRuntime(in: URL(fileURLWithPath: "/Volumes")) {
+            return packageForLocalRuntime(at: discoveredRuntime)
         }
 
         return nil
@@ -248,29 +251,74 @@ public class WhiskyWineInstaller {
     }
 
     private static func fetchLatestGPTKPackage() async -> RuntimePackage? {
+        if let release = await fetchLatestGPTKRelease(),
+           let package = packageForGitHubRelease(release) {
+            return package
+        }
+        return await fetchLatestGPTKPackageFromRedirect()
+    }
+
+    private static func fetchLatestGPTKRelease() async -> GitHubRelease? {
         guard let data = await fetchData(from: latestGPTKReleaseURL) else { return nil }
 
         do {
             let decoder = JSONDecoder()
-            let release = try decoder.decode(GitHubRelease.self, from: data)
-            guard let asset = release.assets.first(where: { asset in
-                asset.name.hasPrefix("game-porting-toolkit-")
-                    && (asset.name.hasSuffix(".tar.xz") || asset.name.hasSuffix(".tar.gz"))
-            }), let downloadURL = URL(string: asset.browserDownloadURL) else {
-                return nil
-            }
-
-            let version = parseVersion(from: [asset.name, release.tagName, release.name]) ?? SemanticVersion(0, 0, 0)
-            return RuntimePackage(
-                downloadURL: downloadURL,
-                version: version,
-                source: "Gcenx/game-porting-toolkit",
-                releaseName: release.name
-            )
+            return try decoder.decode(GitHubRelease.self, from: data)
         } catch {
             print(error)
             return nil
         }
+    }
+
+    private static func packageForGitHubRelease(_ release: GitHubRelease) -> RuntimePackage? {
+        guard let asset = release.assets.first(where: { asset in
+            asset.name.hasPrefix("game-porting-toolkit-")
+                && (asset.name.hasSuffix(".tar.xz") || asset.name.hasSuffix(".tar.gz"))
+        }), let downloadURL = URL(string: asset.browserDownloadURL) else {
+            return nil
+        }
+
+        let version = parseVersion(from: [asset.name, release.tagName, release.name]) ?? SemanticVersion(0, 0, 0)
+        return RuntimePackage(
+            downloadURL: downloadURL,
+            version: version,
+            source: "Gcenx/game-porting-toolkit",
+            releaseName: release.name
+        )
+    }
+
+    private static func fetchLatestGPTKPackageFromRedirect() async -> RuntimePackage? {
+        guard let releaseURL = await resolveFinalURL(for: latestGPTKReleasePageURL) else {
+            return nil
+        }
+
+        let tagName = releaseURL.lastPathComponent
+        let versionSuffix = tagName.replacingOccurrences(of: "Game-Porting-Toolkit-", with: "")
+        guard !versionSuffix.isEmpty, versionSuffix != tagName else {
+            return nil
+        }
+
+        let assetNames = [
+            "game-porting-toolkit-\(versionSuffix).tar.xz",
+            "game-porting-toolkit-\(versionSuffix).tar.gz"
+        ]
+
+        for assetName in assetNames {
+            let assetURL = latestGPTKReleaseDownloadBaseURL
+                .appending(path: tagName)
+                .appending(path: assetName)
+            if await resolveFinalURL(for: assetURL) != nil {
+                let version = parseVersion(from: [assetName, tagName, versionSuffix]) ?? SemanticVersion(0, 0, 0)
+                return RuntimePackage(
+                    downloadURL: assetURL,
+                    version: version,
+                    source: "Gcenx/game-porting-toolkit",
+                    releaseName: tagName.replacingOccurrences(of: "Game-Porting-Toolkit-", with: "Game Porting Toolkit ")
+                )
+            }
+        }
+
+        return nil
     }
 
     private static func fetchLegacyPackage() async -> RuntimePackage? {
@@ -292,26 +340,53 @@ public class WhiskyWineInstaller {
     }
 
     private static func fetchData(from url: URL) async -> Data? {
-        var request = URLRequest(url: url)
-        request.cachePolicy = .reloadIgnoringLocalCacheData
-        request.timeoutInterval = 30
-        if url.host == "api.github.com" {
-            request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
-            request.setValue("Whisky", forHTTPHeaderField: "User-Agent")
-            request.setValue("2022-11-28", forHTTPHeaderField: "X-GitHub-Api-Version")
+        guard let (data, _) = await fetchResponse(from: url) else { return nil }
+        return data
+    }
+
+    private static func resolveFinalURL(for url: URL) async -> URL? {
+        if let (_, response) = await fetchResponse(from: url, method: "HEAD") {
+            return response.url
+        }
+        if let (_, response) = await fetchResponse(from: url, method: "GET") {
+            return response.url
+        }
+        return nil
+    }
+
+    private static func fetchResponse(
+        from url: URL,
+        method: String = "GET",
+        attempts: Int = 3
+    ) async -> (Data, URLResponse)? {
+        for attempt in 0..<attempts {
+            var request = URLRequest(url: url)
+            request.httpMethod = method
+            request.cachePolicy = .reloadIgnoringLocalCacheData
+            request.timeoutInterval = 30
+            if url.host == "api.github.com" {
+                request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
+                request.setValue("Whisky", forHTTPHeaderField: "User-Agent")
+                request.setValue("2022-11-28", forHTTPHeaderField: "X-GitHub-Api-Version")
+            }
+
+            do {
+                let (data, response) = try await session.data(for: request)
+                if let response = response as? HTTPURLResponse,
+                   !(200...299).contains(response.statusCode) {
+                    throw RuntimeInstallError.requestFailed(url: url, statusCode: response.statusCode)
+                }
+                return (data, response)
+            } catch {
+                if attempt == attempts - 1 {
+                    print(error)
+                    return nil
+                }
+                try? await Task.sleep(nanoseconds: UInt64(attempt + 1) * 1_000_000_000)
+            }
         }
 
-        do {
-            let (data, response) = try await session.data(for: request)
-            if let response = response as? HTTPURLResponse,
-               !(200...299).contains(response.statusCode) {
-                return nil
-            }
-            return data
-        } catch {
-            print(error)
-            return nil
-        }
+        return nil
     }
 
     private static func saveVersion(version: SemanticVersion, source: String, releaseName: String?) throws {
@@ -406,7 +481,74 @@ public class WhiskyWineInstaller {
                 return candidate
             }
         }
+
+        let volumesRoot = URL(fileURLWithPath: "/Volumes")
+        if let volumeURLs = try? FileManager.default.contentsOfDirectory(
+            at: volumesRoot,
+            includingPropertiesForKeys: nil,
+            options: [.skipsHiddenFiles]
+        ) {
+            for volumeURL in volumeURLs {
+                for candidate in redistCandidates(for: volumeURL) {
+                    let winePath = candidate.appending(path: "lib").appending(path: "wine")
+                    if FileManager.default.fileExists(atPath: winePath.path) {
+                        return candidate
+                    }
+                }
+            }
+        }
+
+        return discoverNestedRedist(in: URL(fileURLWithPath: "/Volumes"))
+    }
+
+    private static func discoverNestedRuntime(in root: URL) -> URL? {
+        for appURL in discoverNestedDirectories(named: "Game Porting Toolkit.app", in: root, maxDepth: 4) {
+            let candidate = appURL
+                .appending(path: "Contents")
+                .appending(path: "Resources")
+                .appending(path: "wine")
+            if hasWineBinary(in: candidate) {
+                return candidate
+            }
+        }
         return nil
+    }
+
+    private static func discoverNestedRedist(in root: URL) -> URL? {
+        for candidate in discoverNestedDirectories(named: "redist", in: root, maxDepth: 4) {
+            let winePath = candidate.appending(path: "lib").appending(path: "wine")
+            if FileManager.default.fileExists(atPath: winePath.path) {
+                return candidate
+            }
+        }
+        return nil
+    }
+
+    private static func discoverNestedDirectories(named name: String, in root: URL, maxDepth: Int) -> [URL] {
+        guard let enumerator = FileManager.default.enumerator(
+            at: root,
+            includingPropertiesForKeys: nil,
+            options: [.skipsHiddenFiles]
+        ) else {
+            return []
+        }
+
+        let rootDepth = root.pathComponents.count
+        var matches: [URL] = []
+
+        for case let url as URL in enumerator {
+            let depth = url.pathComponents.count - rootDepth
+            if depth > maxDepth {
+                enumerator.skipDescendants()
+                continue
+            }
+
+            guard url.lastPathComponent == name else { continue }
+            matches.append(url)
+            enumerator.skipDescendants()
+        }
+
+        return matches
     }
 
     private static func mergeDirectoryContents(from source: URL, to destination: URL) throws {
@@ -432,19 +574,61 @@ public class WhiskyWineInstaller {
         FileManager.default.fileExists(atPath: folder.appending(path: "bin").appending(path: "wine64").path)
     }
 
+    private static func runtimeCandidates(for volumeURL: URL) -> [URL] {
+        [
+            volumeURL,
+            volumeURL.appending(path: "Applications"),
+            volumeURL.appending(path: "Games.localized")
+        ].map { candidateRoot in
+            candidateRoot
+                .appending(path: "Game Porting Toolkit.app")
+                .appending(path: "Contents")
+                .appending(path: "Resources")
+                .appending(path: "wine")
+        }
+    }
+
+    private static func redistCandidates(for volumeURL: URL) -> [URL] {
+        [
+            volumeURL.appending(path: "redist"),
+            volumeURL.appending(path: "Applications").appending(path: "redist"),
+            volumeURL.appending(path: "Games.localized").appending(path: "redist")
+        ]
+    }
+
     private static func packageForLocalRuntime(at localWineFolder: URL) -> RuntimePackage {
+        let runtimeBundleInfo = localRuntimeBundleInfo(for: localWineFolder)
         let nameComponents = [
             localWineFolder.path(percentEncoded: false),
             localWineFolder.deletingLastPathComponent().lastPathComponent,
-            localWineFolder.deletingLastPathComponent().deletingLastPathComponent().lastPathComponent
+            localWineFolder.deletingLastPathComponent().deletingLastPathComponent().lastPathComponent,
+            runtimeBundleInfo?.versionString ?? ""
         ]
         let version = parseVersion(from: nameComponents) ?? SemanticVersion(0, 0, 0)
         return RuntimePackage(
             downloadURL: localWineFolder,
             version: version,
             source: "Local Game Porting Toolkit",
-            releaseName: "Local GPTK \(version)"
+            releaseName: runtimeBundleInfo?.releaseName ?? "Local GPTK \(version)"
         )
+    }
+
+    private static func localRuntimeBundleInfo(for localWineFolder: URL) -> (versionString: String, releaseName: String)? {
+        let appURL = localWineFolder
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let infoPlistURL = appURL.appending(path: "Contents").appending(path: "Info").appendingPathExtension("plist")
+
+        guard let data = try? Data(contentsOf: infoPlistURL),
+              let plist = try? PropertyListSerialization.propertyList(from: data, format: nil) as? [String: Any],
+              let versionString = (plist["CFBundleShortVersionString"] as? String) ?? (plist["CFBundleVersion"] as? String)
+        else {
+            return nil
+        }
+
+        let bundleName = (plist["CFBundleName"] as? String) ?? "Game Porting Toolkit"
+        return (versionString, "\(bundleName) \(versionString)")
     }
 
     private static func shouldDeleteInstallerArtifact(at url: URL, fileManager: FileManager) -> Bool {
@@ -550,6 +734,7 @@ public class WhiskyWineInstaller {
     private enum RuntimeInstallError: Error {
         case unsupportedArchiveLayout
         case copyOverlayFailed(message: String)
+        case requestFailed(url: URL, statusCode: Int)
     }
 }
 

@@ -26,7 +26,7 @@ enum SetupStage {
 }
 
 struct SetupView: View {
-    @AppStorage("useGlassUI") private var useGlassUI = false
+    @AppStorage("useGlassUI") private var useGlassUI = true
     @State private var path: [SetupStage] = []
     @State var tarLocation: URL = URL(fileURLWithPath: "")
     @State private var runtimeVersion: SemanticVersion?

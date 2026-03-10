@@ -21,6 +21,7 @@ import WhiskyKit
 import UniformTypeIdentifiers
 
 struct BottleListEntry: View {
+    @AppStorage("useGlassUI") private var useGlassUI = true
     let bottle: Bottle
     @Binding var selected: URL?
     @Binding var refresh: Bool
@@ -29,7 +30,49 @@ struct BottleListEntry: View {
     @State private var name: String = ""
 
     var body: some View {
-        Text(name)
+        HStack(spacing: 12) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .fill((isSelected && useGlassUI) ? Color.white.opacity(0.16) : Color.white.opacity(useGlassUI ? 0.08 : 0.0))
+                    .frame(width: 36, height: 36)
+                Image(systemName: bottle.isAvailable ? "wineglass.fill" : "externaldrive.badge.xmark")
+                    .foregroundStyle(bottle.isAvailable ? Color.pink : Color.secondary)
+            }
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(name)
+                    .fontWeight(.semibold)
+                    .lineLimit(1)
+                HStack(spacing: 8) {
+                    Text(bottle.settings.windowsVersion.pretty())
+                    Text(bottle.settings.dxvk ? "DXVK" : "D3DMetal")
+                    if bottle.settings.avxEnabled {
+                        Text("AVX")
+                    }
+                }
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            }
+
+            Spacer()
+
+            if isSelected && useGlassUI {
+                Image(systemName: "arrow.right.circle.fill")
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+        .background {
+            if useGlassUI {
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .fill(isSelected ? Color.white.opacity(0.16) : Color.white.opacity(0.05))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 18, style: .continuous)
+                            .strokeBorder(Color.white.opacity(isSelected ? 0.18 : 0.08), lineWidth: 1)
+                    }
+            }
+        }
             .opacity(bottle.isAvailable ? 1.0 : 0.5)
             .onChange(of: refresh, initial: true) {
                 name = bottle.settings.name
@@ -97,6 +140,10 @@ struct BottleListEntry: View {
                 .disabled(!bottle.isAvailable)
                 .labelStyle(.titleAndIcon)
             }
+    }
+
+    private var isSelected: Bool {
+        selected == bottle.url
     }
 
     func showRemoveAlert(bottle: Bottle) {
