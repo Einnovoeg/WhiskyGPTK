@@ -23,7 +23,15 @@ import os.log
 
 extension Bottle {
     func openCDrive() {
-        NSWorkspace.shared.open(url.appending(path: "drive_c"))
+        let cDriveURL = url.appending(path: "drive_c")
+        do {
+            try FileManager.default.createDirectory(at: cDriveURL, withIntermediateDirectories: true)
+        } catch {
+            print("Failed to create C: drive folder: \(error)")
+        }
+        if !NSWorkspace.shared.open(cDriveURL) {
+            NSWorkspace.shared.open(url)
+        }
     }
 
     func openTerminal() {

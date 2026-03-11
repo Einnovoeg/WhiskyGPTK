@@ -19,6 +19,31 @@
 import Foundation
 import SwiftUI
 
+@MainActor
+final class WhiskyActivityController {
+    static let shared = WhiskyActivityController()
+    private var appNapActivity: NSObjectProtocol?
+
+    private init() {}
+
+    func applyPreferences() {
+        setAppNapDisabled(UserDefaults.standard.object(forKey: "disableAppNap") as? Bool ?? true)
+    }
+
+    func setAppNapDisabled(_ disabled: Bool) {
+        if disabled {
+            guard appNapActivity == nil else { return }
+            appNapActivity = ProcessInfo.processInfo.beginActivity(
+                options: [.userInitiated],
+                reason: "Preventing App Nap for bottle stability"
+            )
+        } else if let appNapActivity {
+            ProcessInfo.processInfo.endActivity(appNapActivity)
+            self.appNapActivity = nil
+        }
+    }
+}
+
 class AppDelegate: NSObject, NSApplicationDelegate {
     @AppStorage("hasShownMoveToApplicationsAlert") private var hasShownMoveToApplicationsAlert = false
 
@@ -33,6 +58,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        WhiskyActivityController.shared.applyPreferences()
+
         if !hasShownMoveToApplicationsAlert && !AppDelegate.insideAppsFolder {
             DispatchQueue.main.asyncAfter(deadline: .now()) {
                 NSApp.activate(ignoringOtherApps: true)

@@ -50,6 +50,8 @@ public struct BottleData: Codable {
     }
 
     public mutating func loadBottles() -> [Bottle] {
+        paths = normalizedStoredPaths(from: paths)
+
         var bottles: [Bottle] = []
 
         for path in paths {
@@ -66,6 +68,71 @@ public struct BottleData: Codable {
         }
 
         return bottles
+    }
+
+    @discardableResult
+    public mutating func registerBottlePath(_ url: URL) -> Bool {
+        let normalizedPath = Self.normalizeBottlePath(url)
+        let pathKey = normalizedPath.path(percentEncoded: false)
+
+        guard !paths.contains(where: { Self.normalizeBottlePath($0).path(percentEncoded: false) == pathKey }) else {
+            return false
+        }
+
+        paths.append(normalizedPath)
+        return true
+    }
+
+    public mutating func removeBottlePath(_ url: URL) {
+        let pathKey = Self.normalizeBottlePath(url).path(percentEncoded: false)
+        paths.removeAll { Self.normalizeBottlePath($0).path(percentEncoded: false) == pathKey }
+    }
+
+    @discardableResult
+    public mutating func registerBottlePaths(in selectedURL: URL) -> Int {
+        let candidates = Self.importableBottlePaths(from: selectedURL)
+        var importedCount = 0
+
+        for candidate in candidates where registerBottlePath(candidate) {
+            importedCount += 1
+        }
+
+        return importedCount
+    }
+
+    public static func importableBottlePaths(from selectedURL: URL) -> [URL] {
+        let normalizedSelection = normalizeBottlePath(selectedURL)
+
+        if looksLikeBottleDirectory(normalizedSelection) {
+            return [normalizedSelection]
+        }
+
+        guard let children = try? FileManager.default.contentsOfDirectory(
+            at: normalizedSelection,
+            includingPropertiesForKeys: [.isDirectoryKey],
+            options: [.skipsHiddenFiles]
+        ) else {
+            return []
+        }
+
+        return children
+            .filter { child in
+                (try? child.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) ?? false
+            }
+            .map(normalizeBottlePath)
+            .filter(looksLikeBottleDirectory)
+            .sorted { $0.lastPathComponent.localizedCaseInsensitiveCompare($1.lastPathComponent) == .orderedAscending }
+    }
+
+    public static func looksLikeBottleDirectory(_ url: URL) -> Bool {
+        let fileManager = FileManager.default
+        let metadataURL = url.appending(path: "Metadata").appendingPathExtension("plist")
+        let driveCURL = url.appending(path: "drive_c")
+        let dosDevicesURL = url.appending(path: "dosdevices")
+
+        return fileManager.fileExists(atPath: metadataURL.path(percentEncoded: false))
+            || fileManager.fileExists(atPath: driveCURL.path(percentEncoded: false))
+            || fileManager.fileExists(atPath: dosDevicesURL.path(percentEncoded: false))
     }
 
     @discardableResult
@@ -97,5 +164,33 @@ public struct BottleData: Codable {
         } catch {
             return false
         }
+    }
+
+    private func normalizedStoredPaths(from paths: [URL]) -> [URL] {
+        var normalizedPaths: [URL] = []
+        var seenPaths: Set<String> = []
+
+        for path in paths {
+            let normalizedPath = Self.normalizeBottlePath(path)
+            var isDirectory = ObjCBool(false)
+            guard FileManager.default.fileExists(
+                atPath: normalizedPath.path(percentEncoded: false),
+                isDirectory: &isDirectory
+            ), isDirectory.boolValue else {
+                continue
+            }
+
+            let pathKey = normalizedPath.path(percentEncoded: false)
+            guard seenPaths.insert(pathKey).inserted else {
+                continue
+            }
+            normalizedPaths.append(normalizedPath)
+        }
+
+        return normalizedPaths
+    }
+
+    private static func normalizeBottlePath(_ url: URL) -> URL {
+        url.resolvingSymlinksInPath().standardizedFileURL
     }
 }

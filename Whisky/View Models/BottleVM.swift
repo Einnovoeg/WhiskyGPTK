@@ -47,28 +47,41 @@ final class BottleVM: ObservableObject, @unchecked Sendable {
                                                         withIntermediateDirectories: true)
                 let bottle = Bottle(bottleUrl: newBottleDir, inFlight: true)
                 bottleId = bottle
+                bottle.settings.name = bottleName
+                bottle.settings.windowsVersion = winVersion
 
                 await MainActor.run {
+                    self.bottlesList.registerBottlePath(newBottleDir)
                     self.bottles.append(bottle)
                 }
 
-                bottle.settings.windowsVersion = winVersion
-                bottle.settings.name = bottleName
                 try await Wine.changeWinVersion(bottle: bottle, win: winVersion)
-                let wineVer = try await Wine.wineVersion()
-                bottle.settings.wineVersion = SemanticVersion(wineVer) ?? SemanticVersion(0, 0, 0)
-                // Add record
+                do {
+                    let wineVer = try await Wine.wineVersion()
+                    bottle.settings.wineVersion = SemanticVersion(wineVer) ?? SemanticVersion(0, 0, 0)
+                } catch {
+                    print("Failed to determine bottle wine version: \(error)")
+                }
+
                 await MainActor.run {
-                    self.bottlesList.paths.append(newBottleDir)
                     self.loadBottles()
                 }
             } catch {
                 print("Failed to create new bottle: \(error)")
-                if let bottle = bottleId {
-                    await MainActor.run {
+                let metadataURL = newBottleDir.appending(path: "Metadata").appendingPathExtension("plist")
+                let fileManager = FileManager.default
+                let keepBottle = fileManager.fileExists(atPath: newBottleDir.path(percentEncoded: false))
+                    || fileManager.fileExists(atPath: metadataURL.path(percentEncoded: false))
+
+                await MainActor.run {
+                    if keepBottle {
+                        self.bottlesList.registerBottlePath(newBottleDir)
+                        self.loadBottles()
+                    } else if let bottle = bottleId {
                         if let index = self.bottles.firstIndex(of: bottle) {
                             self.bottles.remove(at: index)
                         }
+                        self.bottlesList.removeBottlePath(newBottleDir)
                     }
                 }
             }

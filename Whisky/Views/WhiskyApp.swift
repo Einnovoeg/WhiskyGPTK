@@ -84,8 +84,11 @@ struct WhiskyApp: App {
                     panel.begin { result in
                         if result == .OK {
                             if let url = panel.urls.first {
-                                BottleVM.shared.bottlesList.paths.append(url)
+                                let importedCount = BottleVM.shared.bottlesList.registerBottlePaths(in: url)
                                 BottleVM.shared.loadBottles()
+                                if importedCount == 0 {
+                                    WhiskyApp.showBottleImportAlert()
+                                }
                             }
                         }
                     }
@@ -211,5 +214,21 @@ struct WhiskyApp: App {
         } catch {
             return
         }
+    }
+
+    @MainActor
+    static func showBottleImportAlert() {
+        let alert = NSAlert()
+        alert.messageText = String(
+            localized: "alert.importBottle.message",
+            defaultValue: "No bottles were imported."
+        )
+        alert.informativeText = String(
+            localized: "alert.importBottle.info",
+            defaultValue: "Select a bottle folder, or a folder that contains bottle folders with a Metadata.plist or drive_c directory."
+        )
+        alert.alertStyle = .informational
+        alert.addButton(withTitle: String(localized: "button.ok"))
+        alert.runModal()
     }
 }

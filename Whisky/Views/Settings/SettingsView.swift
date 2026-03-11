@@ -26,6 +26,8 @@ struct SettingsView: View {
     @AppStorage("autoInstallWhiskyWineUpdates") var autoInstallWhiskyWineUpdates = true
     @AppStorage("preferLocalGPTKRuntime") var preferLocalGPTKRuntime = true
     @AppStorage("useGlassUI") var useGlassUI = true
+    @AppStorage("disableAppNap") var disableAppNap = true
+    @AppStorage("wrapProgramShortcuts") var wrapProgramShortcuts = true
     @AppStorage("defaultBottleLocation") var defaultBottleLocation = BottleData.defaultBottleDir
     @State private var latestRuntimePackage: WhiskyWineInstaller.RuntimePackage?
     @State private var latestRuntimeSummary = String(
@@ -57,6 +59,16 @@ struct SettingsView: View {
         Form {
             Section("settings.general") {
                 Toggle("settings.toggle.kill.on.terminate", isOn: $killOnTerminate)
+                Toggle(
+                    String(
+                        localized: "settings.toggle.appNap",
+                        defaultValue: "Prevent App Nap to improve stability"
+                    ),
+                    isOn: $disableAppNap
+                )
+                .onChange(of: disableAppNap) { _, isDisabled in
+                    WhiskyActivityController.shared.setAppNapDisabled(isDisabled)
+                }
                 ActionView(
                     text: "settings.path",
                     subtitle: defaultBottleLocation.prettyPath(),
@@ -79,6 +91,13 @@ struct SettingsView: View {
                 Toggle(
                     String(localized: "settings.toggle.glass", defaultValue: "Use glass effects"),
                     isOn: $useGlassUI
+                )
+                Toggle(
+                    String(
+                        localized: "settings.toggle.wrapShortcuts",
+                        defaultValue: "Wrap shortcut icons with Whisky styling"
+                    ),
+                    isOn: $wrapProgramShortcuts
                 )
             } header: {
                 Text(String(localized: "settings.appearance", defaultValue: "Appearance"))
