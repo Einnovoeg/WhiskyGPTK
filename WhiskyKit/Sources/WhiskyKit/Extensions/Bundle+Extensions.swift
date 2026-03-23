@@ -19,6 +19,17 @@
 import Foundation
 
 public extension Bundle {
+    /// User-facing app name used across UI and path decoration.
+    static var appDisplayName: String {
+        let fallbackName = "Whisky GPTK"
+        if let configuredName = (Bundle.main.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String)?
+            .trimmingCharacters(in: .whitespacesAndNewlines),
+           !configuredName.isEmpty {
+            return configuredName
+        }
+        return fallbackName
+    }
+
     static var whiskyBundleIdentifier: String {
         if let environmentOverride = ProcessInfo.processInfo.environment["WHISKY_BUNDLE_ID_OVERRIDE"]?
             .trimmingCharacters(in: .whitespacesAndNewlines),
@@ -26,12 +37,14 @@ public extension Bundle {
             return environmentOverride
         }
 
-        let currentIdentifier = Bundle.main.bundleIdentifier ?? "com.isaacmarovitz.Whisky"
+        let currentIdentifier = Bundle.main.bundleIdentifier ?? "io.whiskygptk.app"
         if hasStoredData(for: currentIdentifier) {
             return currentIdentifier
         }
 
-        let alternates = ["com.isaacmarovitz.Whisky", "com.isaacmarovitz.WhiskyGPTK"]
+        // Discover historical Whisky bundle identifiers by their suffix so the
+        // migration path still works without hard-coding personal bundle IDs.
+        let alternates = discoverLegacyBundleIdentifiers()
             .filter { $0 != currentIdentifier }
         for candidate in alternates where hasStoredData(for: candidate) {
             return candidate
@@ -49,5 +62,43 @@ public extension Bundle {
 
         return fileManager.fileExists(atPath: appSupport.appending(path: bundleIdentifier).path)
             || fileManager.fileExists(atPath: containers.appending(path: bundleIdentifier).path)
+    }
+
+    private static func discoverLegacyBundleIdentifiers() -> [String] {
+        let suffixes = [".Whisky", ".WhiskyGPTK"]
+        var identifiers: Set<String> = ["io.whiskygptk.app"]
+
+        for root in storageRoots() {
+            guard let children = try? FileManager.default.contentsOfDirectory(
+                at: root,
+                includingPropertiesForKeys: [.isDirectoryKey],
+                options: [.skipsHiddenFiles]
+            ) else {
+                continue
+            }
+
+            for child in children {
+                let isDirectory = (try? child.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) ?? false
+                guard isDirectory else {
+                    continue
+                }
+
+                let name = child.lastPathComponent
+                if suffixes.contains(where: name.hasSuffix) {
+                    identifiers.insert(name)
+                }
+            }
+        }
+
+        return identifiers.sorted()
+    }
+
+    private static func storageRoots() -> [URL] {
+        let fileManager = FileManager.default
+        let appSupport = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+        let containers = fileManager.homeDirectoryForCurrentUser
+            .appending(path: "Library")
+            .appending(path: "Containers")
+        return [appSupport, containers]
     }
 }

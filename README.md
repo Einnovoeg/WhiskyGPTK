@@ -1,83 +1,112 @@
-<div align="center">
+# Whisky GPTK
 
-  # Whisky 🥃
-  *Modern Wine + GPTK wrapper for macOS*
-  
-  ![](https://img.shields.io/github/actions/workflow/status/IsaacMarovitz/Whisky/SwiftLint.yml?style=for-the-badge)
-  [![](https://img.shields.io/discord/1115955071549702235?style=for-the-badge)](https://discord.gg/CsqAfs9CnM)
-</div>
+Whisky GPTK is a maintained macOS fork of the archived [Whisky](https://github.com/Whisky-App/Whisky) project.
+It provides a native SwiftUI interface for running Windows games and apps on Apple Silicon Macs with Wine and Game Porting Toolkit runtimes.
 
-## Fork Status
+Current maintained release:
 
-This fork modernizes the original project with maintained runtime sources and refreshed UI polish.
+- Version: `3.0.0`
+- Release date: `2026-03-23`
+- App bundle: `Whisky GPTK`
+- Product: `WhiskyGPTK.app`
 
-<img width="650" alt="Config" src="https://github.com/Whisky-App/Whisky/assets/42140194/d0a405e8-76ee-48f0-92b5-165d184a576b">
+## Project Status
 
-Familiar UI that integrates seamlessly with macOS
+- Upstream `Whisky-App/Whisky` is archived and no longer maintained.
+- This fork keeps the application working with current GPTK runtime sources.
+- The app can install the latest maintained runtime from [Gcenx/game-porting-toolkit](https://github.com/Gcenx/game-porting-toolkit) or use a locally mounted Apple Game Porting Toolkit installation.
 
-<div align="right">
-  <img width="650" alt="New Bottle" src="https://github.com/Whisky-App/Whisky/assets/42140194/ed1a0d69-d8fb-442b-9330-6816ba8981ba">
+## What It Does
 
-  One-click bottle creation and management
-</div>
+- Creates and manages Wine bottles for Windows games and apps.
+- Installs and updates a maintained GPTK-based runtime.
+- Detects local Game Porting Toolkit volumes and optional Apple `redist` overlays.
+- Exposes common bottle actions such as opening `C:` drive, terminal access, Winetricks, and shader cache cleanup.
+- Includes a refreshed macOS-style interface with optional glass effects.
+- Includes `WhiskyCmd` for basic command-line bottle management.
 
-<img width="650" alt="debug" src="https://user-images.githubusercontent.com/42140194/229176642-57b80801-d29b-4123-b1c2-f3b31408ffc6.png">
+## Requirements
 
-Debug and profile with ease
+- Apple Silicon Mac
+- macOS 14.0 or later
+- Xcode 26.3 or later to build from source
+- Swift Package Manager access for package dependencies
+- Homebrew `cabextract` if you want Winetricks support in public builds
 
----
+## Install
 
-Whisky provides a clean and easy-to-use graphical wrapper for Wine built in native SwiftUI. You can make and manage bottles, install and run Windows apps and games, and unlock the full potential of your Mac with no technical knowledge required.
+### Option 1: Build From Source
 
-This fork now resolves runtime packages from maintained sources, prioritizing the latest releases from [Gcenx/game-porting-toolkit](https://github.com/Gcenx/game-porting-toolkit) and falling back to legacy archives when needed.
+1. Clone the repository.
+2. Open `Whisky.xcodeproj` in Xcode.
+3. Install SwiftLint if you want local lint parity with CI:
+   - `brew install swiftlint`
+4. Build the `Whisky` scheme.
+5. Launch `WhiskyGPTK.app` from Xcode or the generated build products.
 
-Translated on [Crowdin](https://crowdin.com/project/whisky).
+### Option 2: GitHub Release
 
----
+If a release asset is attached to the release page, download the published archive for that version.
+Unsigned builds may require manual approval in Gatekeeper, or you can build from source yourself.
 
-## System Requirements
-- CPU: Apple Silicon (M-series chips)
-- OS: macOS Sonoma 14.0 or later
+## Runtime Model
 
-## Installation
+Whisky GPTK does not vendor large Game Porting Toolkit runtime archives in this repository.
+Instead, the app resolves runtimes in this order:
 
-Build from source in Xcode for now. Homebrew instructions from upstream may point to the archived build.
+1. Latest maintained release from `Gcenx/game-porting-toolkit`
+2. A newer locally mounted Apple Game Porting Toolkit runtime, if present
+3. Legacy upstream runtime metadata only as a fallback path
 
-## My game isn't working!
+Winetricks support requires `cabextract` to be installed separately:
 
-Some games need special steps to get working. Check out the [wiki](https://github.com/IsaacMarovitz/Whisky/wiki/Game-Support).
+```bash
+brew install cabextract
+```
 
----
+## Development
 
-## Credits & Acknowledgments
+- Main build target: `Whisky`
+- App product name: `WhiskyGPTK.app`
+- CLI helper: `WhiskyCmd`
+- Package manifest: `WhiskyKit/Package.swift`
+- Dependency reference: [DEPENDENCIES.md](DEPENDENCIES.md)
+- Changelog: [CHANGELOG.md](CHANGELOG.md)
+- Third-party notices: [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)
 
-Whisky is possible thanks to the magic of several projects:
+## Project Resources
 
-- [msync](https://github.com/marzent/wine-msync) by marzent
-- [DXVK-macOS](https://github.com/Gcenx/DXVK-macOS) by Gcenx and doitsujin
-- [MoltenVK](https://github.com/KhronosGroup/MoltenVK) by KhronosGroup
-- [Sparkle](https://github.com/sparkle-project/Sparkle) by sparkle-project
-- [SemanticVersion](https://github.com/SwiftPackageIndex/SemanticVersion) by SwiftPackageIndex
-- [swift-argument-parser](https://github.com/apple/swift-argument-parser) by Apple
-- [SwiftTextTable](https://github.com/scottrhoyt/SwiftyTextTable) by scottrhoyt
-- [Game Porting Toolkit releases](https://github.com/Gcenx/game-porting-toolkit) by Gcenx
-- [CrossOver](https://www.codeweavers.com/crossover) by CodeWeavers and WineHQ
-- D3DMetal by Apple
+- Installation guide: this `README.md`
+- Changelog: [CHANGELOG.md](CHANGELOG.md)
+- Dependencies: [DEPENDENCIES.md](DEPENDENCIES.md)
+- Project notice: [NOTICE.md](NOTICE.md)
+- Third-party notices: [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)
+- Release notes: [RELEASE_NOTES.md](RELEASE_NOTES.md)
+- License texts: [LICENSE](LICENSE) and [LICENSES/](LICENSES/)
+- Releases: [GitHub Releases](https://github.com/Einnovoeg/Whisky-GPTK/releases)
+- Issues: [Issue Tracker](https://github.com/Einnovoeg/Whisky-GPTK/issues)
 
-Special thanks to Gcenx, ohaiibuzzle, and Nat Brown for their support and contributions!
+Use the issue tracker and release page provided by the repository host for the specific copy of the project you are using.
 
----
+## Support
 
-<table>
-  <tr>
-    <td>
-        <picture>
-          <source media="(prefers-color-scheme: dark)" srcset="./images/cw-dark.png">
-          <img src="./images/cw-light.png" width="500">
-        </picture>
-    </td>
-    <td>
-        Whisky wouldn't exist without CrossOver. Support the work of CodeWeavers using our <a href="https://www.codeweavers.com/store?ad=1010">affiliate link</a>.
-    </td>
-  </tr>
-</table>
+- Buy Me a Coffee: [buymeacoffee.com/einnovoeg](https://buymeacoffee.com/einnovoeg)
+
+## Credits
+
+Whisky GPTK remains a derivative work of the original Whisky project and preserves that project's GPL licensing.
+Additional credit and license notices for bundled or linked dependencies are listed in [NOTICE.md](NOTICE.md) and [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+
+Key upstream projects include:
+
+- [Whisky](https://github.com/Whisky-App/Whisky)
+- [Gcenx/game-porting-toolkit](https://github.com/Gcenx/game-porting-toolkit)
+- [Sparkle](https://github.com/sparkle-project/Sparkle)
+- [swift-argument-parser](https://github.com/apple/swift-argument-parser)
+- [SemanticVersion](https://github.com/SwiftPackageIndex/SemanticVersion)
+- [SwiftyTextTable](https://github.com/scottrhoyt/SwiftyTextTable)
+- [Progress.swift](https://github.com/jkandzi/Progress.swift)
+
+## License
+
+This project is licensed under the GNU General Public License, version 3 or later. See [LICENSE](LICENSE).

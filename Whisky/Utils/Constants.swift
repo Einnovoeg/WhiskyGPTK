@@ -17,6 +17,80 @@
 //
 
 import Foundation
+import WhiskyKit
+
+/// Documents that are bundled with the app so users can inspect notices and
+/// install guidance directly from distributed builds.
+enum ProjectDocument {
+    case readme
+    case changelog
+    case dependencies
+    case notice
+    case thirdPartyNotices
+    case license
+
+    fileprivate var resourceName: String {
+        switch self {
+        case .readme:
+            "README"
+        case .changelog:
+            "CHANGELOG"
+        case .dependencies:
+            "DEPENDENCIES"
+        case .notice:
+            "NOTICE"
+        case .thirdPartyNotices:
+            "THIRD_PARTY_NOTICES"
+        case .license:
+            "LICENSE"
+        }
+    }
+
+    fileprivate var resourceExtension: String? {
+        switch self {
+        case .license:
+            nil
+        case .readme, .changelog, .dependencies, .notice, .thirdPartyNotices:
+            "md"
+        }
+    }
+}
+
+enum ProjectInfo {
+    static let displayName = Bundle.appDisplayName
+    static let repositoryURL = URL(string: "https://github.com/Einnovoeg/Whisky-GPTK") ?? fallbackURL
+    static let releasesURL = repositoryURL.appending(path: "releases")
+    static let issuesURL = repositoryURL.appending(path: "issues")
+    static let fundingURL = URL(string: "https://buymeacoffee.com/einnovoeg") ?? fallbackURL
+
+    /// Archived upstream repository retained for source attribution and history.
+    static let archivedRepositoryURL = URL(string: "https://github.com/Whisky-App/Whisky") ?? fallbackURL
+
+    /// Maintained external runtime source used by setup and update flows.
+    static let runtimeReleasesURL = URL(string: "https://github.com/Gcenx/game-porting-toolkit/releases") ?? fallbackURL
+
+    /// GPL reference used when the bundled license file is unavailable.
+    static let gplLicenseURL = URL(string: "https://www.gnu.org/licenses/gpl-3.0-standalone.html") ?? fallbackURL
+
+    static func bundledDocumentURL(_ document: ProjectDocument) -> URL? {
+        Bundle.main.url(forResource: document.resourceName, withExtension: document.resourceExtension)
+    }
+
+    static func documentURL(_ document: ProjectDocument) -> URL {
+        if let bundledURL = bundledDocumentURL(document) {
+            return bundledURL
+        }
+
+        switch document {
+        case .license:
+            return gplLicenseURL
+        case .readme, .changelog, .dependencies, .notice, .thirdPartyNotices:
+            return repositoryURL
+        }
+    }
+
+    private static let fallbackURL = URL(fileURLWithPath: "/")
+}
 
 enum ViewWidth {
     static let small: Double = 400

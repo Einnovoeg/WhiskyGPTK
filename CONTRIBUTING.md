@@ -1,25 +1,37 @@
-# How to contribute
+# Contributing to Whisky GPTK
 
-Thanks for your interest! First, make a fork of Whisky, make a new branch for your changes, and get coding!
+## Scope
 
-# Build environment
+Whisky GPTK is a maintained fork of the archived Whisky project. Contributions should focus on runtime compatibility, bottle reliability, macOS UX quality, documentation, and licensing/compliance hygiene.
 
-Whisky is built using Xcode 15 on macOS Sonoma. All external dependencies are handled through the Swift Package Manager.
+## Build Environment
 
-# Code style
+- Apple Silicon Mac
+- macOS 14.0 or later
+- Xcode 26.3 or later
+- SwiftLint for local lint parity: `brew install swiftlint`
 
-Every Whisky commit is automatically linted using SwiftLint. You can run these checks locally simply by building in Xcode, violations will appear as errors or warnings. For your pull request to be merged, you must meet all the requirements outlined by SwiftLint and have no violations.
+All package dependencies are resolved through Swift Package Manager.
 
-Generally, it is not advised to disable a SwiftLint rule, but there are certain situations where it is necessary. Please use your discretion when disabling rules temporarily.
+## Code Style
 
-SwiftLint does not fully check indentation, but we ask that you indent with 4-width spaces. This can be automatically configured in Xcode's settings.
+- Prefer clear, minimal changes over broad refactors.
+- Keep comments factual and useful; explain intent where code is not obvious.
+- Preserve existing localization behavior when practical.
+- Avoid bundling third-party executables unless their redistribution terms are explicitly reviewed.
 
-All added strings must be properly localised and added to the EN strings file. Do not add keys for other languages or translate within your PR. All translations should be handled on [Crowdin](https://crowdin.com/project/whisky).
+## Validation
 
-# Making your PR
+Before opening a pull request:
 
-Please provide a detailed description of your changes in your PR. If your commits contain UI changes, we ask that you provide screenshots.
+1. Build the `Whisky` scheme in Debug.
+2. Build the `Whisky` scheme in Release if you changed packaging or release metadata.
+3. Run `WhiskyCmd --help` from the built app bundle or build products.
+4. Confirm that bottle creation/import still works if your change touches bottle or runtime code.
 
-# Review
+## Pull Requests
 
-Once your pull request passes CI SwiftLint checks and builds, it will be ready for review. You may receive feedback on code that should changed. Once you have received an approval, your code will be merged!
+- Use a focused branch.
+- Describe the problem, the change, and the validation steps.
+- Include screenshots for UI changes.
+- Call out license or dependency changes explicitly.

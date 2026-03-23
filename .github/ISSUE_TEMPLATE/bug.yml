@@ -1,57 +1,65 @@
 name: Bug Report
-description: Report a bug.
-type: "Bug"
+description: Report a reproducible problem in Whisky GPTK.
+title: '[Bug]: '
+labels:
+  - bug
 body:
   - type: textarea
     id: description
     attributes:
       label: Description
-      description: Please provide a description of the bug.
+      description: Describe the problem clearly and concisely.
+      placeholder: The bottle opens, but the app crashes before the launcher appears.
     validations:
       required: true
   - type: textarea
-    id: reproduce
+    id: steps
     attributes:
       label: Steps to reproduce
-      description: Please provide detailed step-by-step instructions on how to reproduce this issue.
+      description: List the exact steps needed to reproduce the issue.
     validations:
       required: true
   - type: textarea
-    id: expected-behaviour
+    id: expected
     attributes:
-      label: Expected behaviour
-      description: Please provide a clear a detailed description of what you expected to happen.
+      label: Expected behavior
+      description: What should have happened instead?
+    validations:
+      required: true
+  - type: input
+    id: app-version
+    attributes:
+      label: Whisky GPTK version
+      description: Include the app version shown in the bundle or release.
+      placeholder: 3.0.0
+    validations:
+      required: true
+  - type: input
+    id: runtime-version
+    attributes:
+      label: Runtime version
+      description: Include the installed GPTK/Wine runtime version if known.
+      placeholder: 3.0.3
+  - type: input
+    id: macos-version
+    attributes:
+      label: macOS version
+      description: Include the full macOS version.
+      placeholder: 26.0 beta / 15.6 / 14.7
     validations:
       required: true
   - type: textarea
     id: logs
     attributes:
       label: Logs
-      description: Please provide the logs from the launched Wine process. These can be found by pressing `CMD + L` in Whisky.
-      render: bash
-    validations:
-      required: true
-  - type: dropdown
-    id: whisky-version
-    attributes:
-      label: What version of Whisky are you using?
-      options:
-        - "2.3.2"
-        - "<2.3.2"
-    validations:
-      required: true
-  - type: dropdown
-    id: mac-version
-    attributes:
-      label: What version of macOS are you using?
-      options:
-        - "Sonoma (macOS 14)"
-    validations:
-      required: true
+      description: Paste relevant logs. In the app, use Command-L to open the logs folder.
+      render: text
   - type: checkboxes
+    id: checks
     attributes:
-      label: Issue Language
-      description: All issues must be written in clear plain English so that all devs are able to read them.
+      label: Pre-flight checks
       options:
-        - label: Yes my issue is written in English
+        - label: I searched existing issues before filing this report.
+          required: true
+        - label: I removed personal information from the logs I shared.
           required: true

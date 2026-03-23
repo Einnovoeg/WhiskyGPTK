@@ -67,7 +67,7 @@ struct WhiskyApp: App {
                 Button("open.setup") {
                     showSetup = true
                 }
-                Button("install.cli") {
+                Button(String(localized: "install.cli", defaultValue: "Install Whisky GPTK CLI...")) {
                     Task {
                         await WhiskyCmd.install()
                     }
@@ -110,25 +110,39 @@ struct WhiskyApp: App {
                 }
             }
             CommandGroup(replacing: .help) {
-                Button("help.website") {
-                    if let url = URL(string: "https://getwhisky.app/") {
-                        openURL(url)
+                Button(String(localized: "help.repository", defaultValue: "Project Repository")) {
+                    openURL(ProjectInfo.repositoryURL)
+                }
+                Button(String(localized: "help.releases", defaultValue: "Latest Releases")) {
+                    openURL(ProjectInfo.releasesURL)
+                }
+                Button(String(localized: "help.issues", defaultValue: "Report an Issue")) {
+                    openURL(ProjectInfo.issuesURL)
+                }
+                if let readmeURL = ProjectInfo.bundledDocumentURL(.readme) {
+                    Button(String(localized: "help.readme", defaultValue: "Installation Guide")) {
+                        openURL(readmeURL)
                     }
                 }
-                Button("help.github") {
-                    if let url = URL(string: "https://github.com/Whisky-App/Whisky") {
-                        openURL(url)
+                if let changelogURL = ProjectInfo.bundledDocumentURL(.changelog) {
+                    Button(String(localized: "help.changelog", defaultValue: "Changelog")) {
+                        openURL(changelogURL)
                     }
                 }
-                Button("Game Porting Toolkit Releases") {
-                    if let url = URL(string: "https://github.com/Gcenx/game-porting-toolkit/releases") {
-                        openURL(url)
-                    }
+                Button(String(localized: "help.upstream", defaultValue: "Archived Upstream Repository")) {
+                    openURL(ProjectInfo.archivedRepositoryURL)
                 }
-                Button("help.discord") {
-                    if let url = URL(string: "https://discord.gg/CsqAfs9CnM") {
-                        openURL(url)
-                    }
+                Button(String(localized: "help.runtime", defaultValue: "Game Porting Toolkit Releases")) {
+                    openURL(ProjectInfo.runtimeReleasesURL)
+                }
+                Button(String(localized: "help.notices", defaultValue: "Third-Party Notices")) {
+                    openURL(ProjectInfo.documentURL(.thirdPartyNotices))
+                }
+                Button(String(localized: "help.license", defaultValue: "Project License")) {
+                    openURL(ProjectInfo.documentURL(.license))
+                }
+                Button(String(localized: "help.support", defaultValue: "Buy Me a Coffee")) {
+                    openURL(ProjectInfo.fundingURL)
                 }
             }
         }

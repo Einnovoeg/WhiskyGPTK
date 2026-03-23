@@ -21,46 +21,64 @@ import WhiskyKit
 
 struct WelcomeView: View {
     @State var rosettaInstalled: Bool?
-    @State var whiskyWineInstalled: Bool?
+    @State var runtimeInstalled: Bool?
     @State var shouldCheckInstallStatus: Bool = false
     @Binding var path: [SetupStage]
     @Binding var showSetup: Bool
     var firstTime: Bool
+    private var appDisplayName: String { Bundle.appDisplayName }
+    private var welcomeTitle: String {
+        if firstTime {
+            return String(
+                localized: "setup.whiskygptk.welcome",
+                defaultValue: "Welcome to \(appDisplayName)"
+            )
+        }
+
+        return String(
+            localized: "setup.whiskygptk.dependencies",
+            defaultValue: "Runtime Setup"
+        )
+    }
+    private var welcomeSubtitle: String {
+        if firstTime {
+            return String(
+                localized: "setup.whiskygptk.welcome.subtitle",
+                defaultValue: "Install Rosetta and the GPTK runtime needed to run Windows software on macOS."
+            )
+        }
+
+        return String(
+            localized: "setup.whiskygptk.dependencies.subtitle",
+            defaultValue: "Review and install the required runtime components for this Mac."
+        )
+    }
 
     var body: some View {
         VStack {
             VStack {
                 WhiskyBrandIcon(size: 72)
                     .padding(.bottom, 6)
-                if firstTime {
-                    Text("setup.welcome")
-                        .font(.title)
-                        .fontWeight(.bold)
-                    Text("setup.welcome.subtitle")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                } else {
-                    Text("setup.title")
-                        .font(.title)
-                        .fontWeight(.bold)
-                    Text("setup.subtitle")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                }
+                Text(welcomeTitle)
+                    .font(.title)
+                    .fontWeight(.bold)
+                Text(welcomeSubtitle)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
             }
             .padding(.horizontal)
             Spacer()
             Form {
                 InstallStatusView(isInstalled: $rosettaInstalled,
                                   shouldCheckInstallStatus: $shouldCheckInstallStatus,
-                                  name: "Rosetta")
-                InstallStatusView(isInstalled: $whiskyWineInstalled,
+                                  dependency: .rosetta)
+                InstallStatusView(isInstalled: $runtimeInstalled,
                                   shouldCheckInstallStatus: $shouldCheckInstallStatus,
-                                  showUninstall: true,
-                                  name: "WhiskyWine")
+                                  dependency: .runtime)
             }
             .formStyle(.grouped)
             .scrollDisabled(true)
+            .whiskyGlassCard(cornerRadius: 26)
             .onAppear {
                 checkInstallStatus()
             }
@@ -70,21 +88,21 @@ struct WelcomeView: View {
             Spacer()
             HStack {
                 if let rosettaInstalled = rosettaInstalled,
-                   let whiskyWineInstalled = whiskyWineInstalled {
-                    if !rosettaInstalled || !whiskyWineInstalled {
+                   let runtimeInstalled = runtimeInstalled {
+                    if !rosettaInstalled || !runtimeInstalled {
                         Button("setup.quit") {
                             exit(0)
                         }
                         .keyboardShortcut(.cancelAction)
                     }
                     Spacer()
-                    Button(rosettaInstalled && whiskyWineInstalled ? "setup.done" : "setup.next") {
+                    Button(rosettaInstalled && runtimeInstalled ? "setup.done" : "setup.next") {
                         if !rosettaInstalled {
                             path.append(.rosetta)
                             return
                         }
 
-                        if !whiskyWineInstalled {
+                        if !runtimeInstalled {
                             path.append(.whiskyWineDownload)
                             return
                         }
@@ -100,15 +118,37 @@ struct WelcomeView: View {
 
     func checkInstallStatus() {
         rosettaInstalled = Rosetta2.isRosettaInstalled
-        whiskyWineInstalled = WhiskyWineInstaller.isWhiskyWineInstalled()
+        runtimeInstalled = WhiskyWineInstaller.isWhiskyWineInstalled()
+    }
+}
+
+enum SetupDependency {
+    case rosetta
+    case runtime
+
+    var displayName: String {
+        switch self {
+        case .rosetta:
+            return "Rosetta"
+        case .runtime:
+            return "GPTK Runtime"
+        }
+    }
+
+    var showsUninstall: Bool {
+        self == .runtime
+    }
+
+    func uninstallIfNeeded() {
+        guard self == .runtime else { return }
+        WhiskyWineInstaller.uninstall()
     }
 }
 
 struct InstallStatusView: View {
     @Binding var isInstalled: Bool?
     @Binding var shouldCheckInstallStatus: Bool
-    @State var showUninstall: Bool = false
-    @State var name: String
+    let dependency: SetupDependency
     @State var text: String = String(localized: "setup.install.checking")
 
     var body: some View {
@@ -123,10 +163,10 @@ struct InstallStatusView: View {
                 }
             }
             .frame(width: 10)
-            Text(String.init(format: text, name))
+            Text(String(format: text, dependency.displayName))
             Spacer()
             if let installed = isInstalled {
-                if installed && showUninstall {
+                if installed && dependency.showsUninstall {
                     Button("setup.uninstall") {
                         uninstall()
                     }
@@ -147,10 +187,7 @@ struct InstallStatusView: View {
     }
 
     func uninstall() {
-        if name == "WhiskyWine" {
-            WhiskyWineInstaller.uninstall()
-        }
-
+        dependency.uninstallIfNeeded()
         shouldCheckInstallStatus.toggle()
     }
 }

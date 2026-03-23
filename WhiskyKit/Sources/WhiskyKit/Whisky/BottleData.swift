@@ -19,6 +19,10 @@
 import Foundation
 import SemanticVersion
 
+/// Persistent index of known bottle locations.
+///
+/// The app keeps bottle paths separate from the bottle contents so that bottles
+/// on external drives or custom directories can be re-discovered after relaunch.
 public struct BottleData: Codable {
     public static let containerDir = FileManager.default.homeDirectoryForCurrentUser
         .appending(path: "Library")
@@ -49,6 +53,8 @@ public struct BottleData: Codable {
         }
     }
 
+    /// Loads registered paths, normalizes them, drops stale entries, and
+    /// creates lightweight bottle models for the UI.
     public mutating func loadBottles() -> [Bottle] {
         paths = normalizedStoredPaths(from: paths)
 
@@ -173,6 +179,8 @@ public struct BottleData: Codable {
         for path in paths {
             let normalizedPath = Self.normalizeBottlePath(path)
             var isDirectory = ObjCBool(false)
+            // Ignore paths that no longer exist or no longer point at a bottle
+            // root so the stored list self-heals over time.
             guard FileManager.default.fileExists(
                 atPath: normalizedPath.path(percentEncoded: false),
                 isDirectory: &isDirectory

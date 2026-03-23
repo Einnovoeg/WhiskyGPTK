@@ -20,15 +20,15 @@ import Foundation
 import SemanticVersion
 
 public class WhiskyWineInstaller {
-    /// The Whisky application folder
+    /// Application Support root scoped by the active bundle identifier.
     public static let applicationFolder = FileManager.default.urls(
         for: .applicationSupportDirectory, in: .userDomainMask
     )[0].appending(path: Bundle.whiskyBundleIdentifier)
 
-    /// The folder of all the library files
+    /// Root folder that stores the installed runtime payload and helper files.
     public static let libraryFolder = applicationFolder.appending(path: "Libraries")
 
-    /// URL to the installed `wine` `bin` directory
+    /// URL to the installed `wine` `bin` directory.
     public static let binFolder: URL = libraryFolder.appending(path: "Wine").appending(path: "bin")
 
     private static let latestGPTKReleaseURL = URL(
@@ -67,6 +67,7 @@ public class WhiskyWineInstaller {
         URL(fileURLWithPath: "/Volumes/Game Porting Toolkit/redist")
     ]
 
+    /// Resolved runtime metadata used by setup, settings, and update checks.
     public struct RuntimePackage {
         public let downloadURL: URL
         public let version: SemanticVersion
@@ -85,6 +86,11 @@ public class WhiskyWineInstaller {
         whiskyWineVersion() != nil
     }
 
+    /// Installs a runtime from either an archive or a local extracted directory.
+    ///
+    /// The installer preserves compatible extras such as DXVK and Winetricks so
+    /// runtime upgrades do not silently remove them when the new payload does
+    /// not bundle identical copies.
     @discardableResult
     public static func install(
         from archiveURL: URL,
@@ -126,7 +132,7 @@ public class WhiskyWineInstaller {
             }
             installSucceeded = true
         } catch {
-            print("Failed to install WhiskyWine: \(error)")
+            print("Failed to install runtime: \(error)")
             do {
                 if !fileManager.fileExists(atPath: libraryFolder.path) {
                     try fileManager.createDirectory(at: libraryFolder, withIntermediateDirectories: true)
@@ -157,10 +163,12 @@ public class WhiskyWineInstaller {
         do {
             try FileManager.default.removeItem(at: libraryFolder)
         } catch {
-            print("Failed to uninstall WhiskyWine: \(error)")
+            print("Failed to uninstall runtime: \(error)")
         }
     }
 
+    /// Resolves the best available runtime by comparing remote maintained GPTK
+    /// releases with any mounted local toolkit installations.
     public static func latestRuntimePackage() async -> RuntimePackage? {
         let localPackage = prefersLocalRuntime() ? localRuntimePackage() : nil
 
@@ -215,6 +223,8 @@ public class WhiskyWineInstaller {
         FileManager.default.fileExists(atPath: libraryFolder.appending(path: "winetricks").path)
     }
 
+    /// Detects a directly usable local GPTK runtime on disk, including mounted
+    /// volumes that expose `Game Porting Toolkit.app` outside `/Applications`.
     public static func localRuntimePackage() -> RuntimePackage? {
         if let environmentPath = ProcessInfo.processInfo.environment["WHISKY_GPTK_LOCAL_RUNTIME_PATH"] {
             let candidate = URL(fileURLWithPath: environmentPath)
@@ -337,8 +347,8 @@ public class WhiskyWineInstaller {
             return RuntimePackage(
                 downloadURL: legacyRuntimeArchiveURL,
                 version: info.version,
-                source: "Whisky Legacy Runtime",
-                releaseName: "WhiskyWine \(info.version)"
+                source: "Legacy Runtime Feed",
+                releaseName: "Legacy Runtime \(info.version)"
             )
         } catch {
             print(error)
@@ -373,7 +383,7 @@ public class WhiskyWineInstaller {
             request.timeoutInterval = 30
             if url.host == "api.github.com" {
                 request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
-                request.setValue("Whisky", forHTTPHeaderField: "User-Agent")
+                request.setValue("WhiskyGPTK", forHTTPHeaderField: "User-Agent")
                 request.setValue("2022-11-28", forHTTPHeaderField: "X-GitHub-Api-Version")
             }
 
@@ -747,7 +757,7 @@ public class WhiskyWineInstaller {
 
 struct WhiskyWineVersion: Codable {
     var version: SemanticVersion = SemanticVersion(1, 0, 0)
-    var source: String = "Whisky"
+    var source: String = "Whisky GPTK"
     var releaseName: String?
 
     enum CodingKeys: String, CodingKey {
@@ -756,7 +766,7 @@ struct WhiskyWineVersion: Codable {
         case releaseName
     }
 
-    init(version: SemanticVersion = SemanticVersion(1, 0, 0), source: String = "Whisky", releaseName: String? = nil) {
+    init(version: SemanticVersion = SemanticVersion(1, 0, 0), source: String = "Whisky GPTK", releaseName: String? = nil) {
         self.version = version
         self.source = source
         self.releaseName = releaseName
@@ -765,7 +775,7 @@ struct WhiskyWineVersion: Codable {
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         version = try container.decodeIfPresent(SemanticVersion.self, forKey: .version) ?? SemanticVersion(1, 0, 0)
-        source = try container.decodeIfPresent(String.self, forKey: .source) ?? "Whisky"
+        source = try container.decodeIfPresent(String.self, forKey: .source) ?? "Whisky GPTK"
         releaseName = try container.decodeIfPresent(String.self, forKey: .releaseName)
     }
 }

@@ -30,6 +30,16 @@ struct WinetricksView: View {
             VStack {
                 Text("winetricks.title")
                     .font(.title)
+                if !Winetricks.hasCabextract() {
+                    Text(
+                        String(
+                            localized: "winetricks.cabextract.banner",
+                            defaultValue: "Install Homebrew `cabextract` to run Winetricks verbs in public builds."
+                        )
+                    )
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                }
             }
             .padding(.bottom)
 
@@ -68,6 +78,7 @@ struct WinetricksView: View {
                             dismiss()
                         }
                         .buttonStyle(.borderedProminent)
+                        .disabled(selectedTrick == nil || !Winetricks.hasCabextract())
                     }
                 }
             } else {

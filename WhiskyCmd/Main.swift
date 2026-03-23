@@ -26,7 +26,7 @@ import ArgumentParser
 @main
 struct Whisky: ParsableCommand {
     static let configuration = CommandConfiguration(
-        abstract: "A CLI interface for Whisky.",
+        abstract: "A CLI interface for Whisky GPTK.",
         subcommands: [List.self,
                       Create.self,
                       Add.self,
@@ -82,7 +82,7 @@ extension Whisky {
                 bottle.settings.wineVersion = SemanticVersion(0, 0, 0)
 
                 var bottlesList = BottleData()
-                bottlesList.paths.append(bottleURL)
+                _ = bottlesList.registerBottlePath(bottleURL)
                 print("Created new bottle \"\(name)\".")
             } catch {
                 throw ValidationError("\(error)")
@@ -96,12 +96,15 @@ extension Whisky {
         @Argument var path: String
 
         mutating func run() throws {
-            // Should be sanitised
             let bottleURL = URL(filePath: path)
-            let settings = try BottleSettings.decode(from: bottleURL)
             var bottlesList = BottleData()
-            bottlesList.paths.append(bottleURL)
-            print("Bottle \"\(settings.name)\" added.")
+            let importedCount = bottlesList.registerBottlePaths(in: bottleURL)
+
+            guard importedCount > 0 else {
+                throw ValidationError("No valid bottle directory was found at \"\(path)\".")
+            }
+
+            print("Imported \(importedCount) bottle(s).")
         }
     }
 
@@ -139,7 +142,7 @@ extension Whisky {
     }
 
     struct Remove: ParsableCommand {
-        static let configuration = CommandConfiguration(abstract: "Remove an existing bottle from Whisky.",
+        static let configuration = CommandConfiguration(abstract: "Remove an existing bottle from Whisky GPTK.",
                                                         discussion: "This will not remove the bottle from disk.")
 
         @Argument var name: String
@@ -159,7 +162,7 @@ extension Whisky {
     }
 
     struct Run: ParsableCommand {
-        static let configuration = CommandConfiguration(abstract: "Run a program with Whisky.")
+        static let configuration = CommandConfiguration(abstract: "Run a program with Whisky GPTK.")
 
         @Argument var bottleName: String
         @Argument var path: String
@@ -199,7 +202,7 @@ extension Whisky {
     }
 
     struct Install: ParsableCommand {
-        static let configuration = CommandConfiguration(abstract: "Install WhiskyWine.")
+        static let configuration = CommandConfiguration(abstract: "Install the GPTK runtime.")
 
         mutating func run() throws {
 
@@ -207,9 +210,9 @@ extension Whisky {
     }
 
     struct Uninstall: ParsableCommand {
-        static let configuration = CommandConfiguration(abstract: "Uninstall WhiskyWine.")
+        static let configuration = CommandConfiguration(abstract: "Uninstall the GPTK runtime.")
 
-        @Flag(name: [.long, .short], help: "Uninstall WhiskyWine") var whiskyWine = false
+        @Flag(name: [.long, .short], help: "Uninstall the GPTK runtime") var whiskyWine = false
 
         mutating func run() throws {
 

@@ -43,6 +43,11 @@ struct SettingsView: View {
         }
         return !feedURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }()
+    private var appVersionSummary: String {
+        let marketingVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0.0.0"
+        let buildNumber = Bundle.main.object(forInfoDictionaryKey: kCFBundleVersionKey as String) as? String ?? "0"
+        return "\(marketingVersion) (\(buildNumber))"
+    }
     private var runtimeSummary: String {
         let version = WhiskyWineInstaller.whiskyWineVersion().map(String.init) ?? String(
             localized: "settings.runtime.notInstalled",
@@ -57,8 +62,41 @@ struct SettingsView: View {
 
     var body: some View {
         Form {
+            Section {
+                HStack(alignment: .center, spacing: 14) {
+                    WhiskyBrandIcon(size: 56)
+
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(ProjectInfo.displayName)
+                            .font(.title3.weight(.semibold))
+                        Text("Version \(appVersionSummary)")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                        Text("Runtime \(runtimeSummary)")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+
+                    Spacer()
+
+                    if useGlassUI {
+                        WhiskyGlassBadge(
+                            icon: "sparkles.rectangle.stack",
+                            title: "Maintained Build",
+                            tint: WhiskyBrandPalette.amber
+                        )
+                    }
+                }
+                .padding(.vertical, 4)
+            }
             Section("settings.general") {
-                Toggle("settings.toggle.kill.on.terminate", isOn: $killOnTerminate)
+                Toggle(
+                    String(
+                        localized: "settings.toggle.kill.on.terminate",
+                        defaultValue: "Terminate Wine processes when \(ProjectInfo.displayName) closes"
+                    ),
+                    isOn: $killOnTerminate
+                )
                 Toggle(
                     String(
                         localized: "settings.toggle.appNap",
@@ -95,7 +133,7 @@ struct SettingsView: View {
                 Toggle(
                     String(
                         localized: "settings.toggle.wrapShortcuts",
-                        defaultValue: "Wrap shortcut icons with Whisky styling"
+                        defaultValue: "Wrap shortcut icons with app styling"
                     ),
                     isOn: $wrapProgramShortcuts
                 )
@@ -104,14 +142,26 @@ struct SettingsView: View {
             }
             Section("settings.updates") {
                 if hasAppUpdateFeed {
-                    Toggle("settings.toggle.whisky.updates", isOn: $whiskyUpdate)
+                    Toggle(
+                        String(
+                            localized: "settings.toggle.whisky.updates",
+                            defaultValue: "Automatically check for app updates"
+                        ),
+                        isOn: $whiskyUpdate
+                    )
                 } else {
                     Text(String(localized: "settings.appfeed.unconfigured",
                                 defaultValue: "App update feed is not configured for this build."))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
-                Toggle("settings.toggle.whiskywine.updates", isOn: $checkWhiskyWineUpdates)
+                Toggle(
+                    String(
+                        localized: "settings.toggle.whiskywine.updates",
+                        defaultValue: "Automatically check for runtime updates"
+                    ),
+                    isOn: $checkWhiskyWineUpdates
+                )
                 Toggle(
                     String(localized: "settings.toggle.whiskywine.autoInstall",
                            defaultValue: "Automatically install runtime updates"),
@@ -172,6 +222,68 @@ struct SettingsView: View {
                     }
                     .disabled(isRefreshingRuntime || isInstallingRuntime || latestRuntimePackage == nil)
                 }
+            }
+            Section {
+                if let readmeURL = ProjectInfo.bundledDocumentURL(.readme) {
+                    Link(
+                        String(localized: "settings.resources.readme", defaultValue: "Installation Guide"),
+                        destination: readmeURL
+                    )
+                }
+                if let changelogURL = ProjectInfo.bundledDocumentURL(.changelog) {
+                    Link(
+                        String(localized: "settings.resources.changelog", defaultValue: "Changelog"),
+                        destination: changelogURL
+                    )
+                }
+                if let dependenciesURL = ProjectInfo.bundledDocumentURL(.dependencies) {
+                    Link(
+                        String(localized: "settings.resources.dependencies", defaultValue: "Dependencies"),
+                        destination: dependenciesURL
+                    )
+                }
+                Link(
+                    String(localized: "settings.resources.repository", defaultValue: "Project Repository"),
+                    destination: ProjectInfo.repositoryURL
+                )
+                Link(
+                    String(localized: "settings.resources.releases", defaultValue: "Latest Releases"),
+                    destination: ProjectInfo.releasesURL
+                )
+                Link(
+                    String(localized: "settings.resources.issues", defaultValue: "Report an Issue"),
+                    destination: ProjectInfo.issuesURL
+                )
+                Link(
+                        String(localized: "settings.resources.upstream", defaultValue: "Archived Upstream Repository"),
+                        destination: ProjectInfo.archivedRepositoryURL
+                )
+                Link(
+                    String(localized: "settings.resources.runtime", defaultValue: "GPTK Runtime Releases"),
+                    destination: ProjectInfo.runtimeReleasesURL
+                )
+                Link(
+                    String(localized: "settings.resources.notices", defaultValue: "Third-Party Notices"),
+                    destination: ProjectInfo.documentURL(.thirdPartyNotices)
+                )
+                Link(
+                    String(localized: "settings.resources.license", defaultValue: "Project License"),
+                    destination: ProjectInfo.documentURL(.license)
+                )
+                Link(
+                    String(localized: "settings.resources.support", defaultValue: "Buy Me a Coffee"),
+                    destination: ProjectInfo.fundingURL
+                )
+            } header: {
+                Text(String(localized: "settings.resources", defaultValue: "Resources"))
+            } footer: {
+                Text(
+                    String(
+                        localized: "settings.resources.footer",
+                        defaultValue: "This build bundles install guidance, notices, and license texts for redistribution compliance."
+                    )
+                )
+                .font(.caption)
             }
         }
         .formStyle(.grouped)

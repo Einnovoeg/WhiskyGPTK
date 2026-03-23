@@ -39,10 +39,20 @@ struct WhiskyWineDownloadView: View {
     var body: some View {
         VStack {
             VStack {
-                Text("setup.whiskywine.download")
+                Text(
+                    String(
+                        localized: "setup.whiskygptk.runtime.download",
+                        defaultValue: "Download Runtime"
+                    )
+                )
                     .font(.title)
                     .fontWeight(.bold)
-                Text("setup.whiskywine.download.subtitle")
+                Text(
+                    String(
+                        localized: "setup.whiskygptk.runtime.download.subtitle",
+                        defaultValue: "Fetching the latest maintained GPTK runtime package."
+                    )
+                )
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                 Text(releaseLabel)
@@ -93,7 +103,7 @@ struct WhiskyWineDownloadView: View {
             Task {
                 let package = await WhiskyWineInstaller.latestRuntimePackage()
                 runtimeVersion = package?.version
-                runtimeSource = package?.source ?? "Whisky Legacy Runtime"
+                runtimeSource = package?.source ?? "Legacy Runtime Feed"
                 runtimeReleaseName = package?.releaseName
                 releaseLabel = package.map { "\($0.releaseName) via \($0.source)" } ?? "Using legacy runtime source"
 

@@ -18,6 +18,7 @@
 
 import Foundation
 import SwiftUI
+import WhiskyKit
 
 @MainActor
 final class WhiskyActivityController {
@@ -89,7 +90,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private static var appDisplayName: String {
-        (Bundle.main.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String) ?? "Whisky"
+        Bundle.appDisplayName
     }
 
     private static var insideAppsFolder: Bool {

@@ -34,10 +34,20 @@ struct WhiskyWineInstallView: View {
     var body: some View {
         VStack {
             VStack {
-                Text("setup.whiskywine.install")
+                Text(
+                    String(
+                        localized: "setup.whiskygptk.runtime.install",
+                        defaultValue: "Install Runtime"
+                    )
+                )
                     .font(.title)
                     .fontWeight(.bold)
-                Text("setup.whiskywine.install.subtitle")
+                Text(
+                    String(
+                        localized: "setup.whiskygptk.runtime.install.subtitle",
+                        defaultValue: "Installing the selected GPTK runtime into Application Support."
+                    )
+                )
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                 Spacer()

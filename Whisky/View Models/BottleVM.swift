@@ -22,6 +22,10 @@ import WhiskyKit
 
 // swiftlint:disable:next todo
 // TODO: Don't use unchecked!
+/// Shared bottle state for the SwiftUI app.
+///
+/// Bottle creation is intentionally asynchronous because creating the prefix and
+/// querying the runtime version can block for a noticeable amount of time.
 final class BottleVM: ObservableObject, @unchecked Sendable {
     @MainActor static let shared = BottleVM()
 
@@ -34,9 +38,12 @@ final class BottleVM: ObservableObject, @unchecked Sendable {
     }
 
     func countActive() -> Int {
-        return bottles.filter { $0.isAvailable == true }.count
+        bottles.filter { $0.isAvailable == true }.count
     }
 
+    /// Creates the bottle directory immediately and then finishes the heavier
+    /// Wine prefix setup off the main thread. The URL is returned up front so
+    /// the UI can select and scroll to the placeholder entry while setup runs.
     func createNewBottle(bottleName: String, winVersion: WinVersion, bottleURL: URL) -> URL {
         let newBottleDir = bottleURL.appending(path: UUID().uuidString)
 
@@ -51,6 +58,8 @@ final class BottleVM: ObservableObject, @unchecked Sendable {
                 bottle.settings.windowsVersion = winVersion
 
                 await MainActor.run {
+                    // Register the path before prefix creation completes so the
+                    // list stays in sync with the in-flight bottle placeholder.
                     self.bottlesList.registerBottlePath(newBottleDir)
                     self.bottles.append(bottle)
                 }
@@ -68,10 +77,9 @@ final class BottleVM: ObservableObject, @unchecked Sendable {
                 }
             } catch {
                 print("Failed to create new bottle: \(error)")
-                let metadataURL = newBottleDir.appending(path: "Metadata").appendingPathExtension("plist")
-                let fileManager = FileManager.default
-                let keepBottle = fileManager.fileExists(atPath: newBottleDir.path(percentEncoded: false))
-                    || fileManager.fileExists(atPath: metadataURL.path(percentEncoded: false))
+                // If setup made it far enough to create a real prefix, keep the
+                // bottle entry instead of hiding a partially recoverable bottle.
+                let keepBottle = BottleData.looksLikeBottleDirectory(newBottleDir)
 
                 await MainActor.run {
                     if keepBottle {

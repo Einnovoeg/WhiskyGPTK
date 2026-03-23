@@ -71,7 +71,7 @@ public class Wine {
         name: String? = nil, args: [String], bottle: Bottle, environment: [String: String] = [:]
     ) throws -> AsyncStream<ProcessOutput> {
         let fileHandle = try makeFileHandle()
-        fileHandle.writeApplicaitonInfo()
+        fileHandle.writeApplicationInfo()
         fileHandle.writeInfo(for: bottle)
 
         return try runWineProcess(
@@ -86,7 +86,7 @@ public class Wine {
         name: String? = nil, args: [String], bottle: Bottle, environment: [String: String] = [:]
     ) throws -> AsyncStream<ProcessOutput> {
         let fileHandle = try makeFileHandle()
-        fileHandle.writeApplicaitonInfo()
+        fileHandle.writeApplicationInfo()
         fileHandle.writeInfo(for: bottle)
 
         return try runWineserverProcess(
@@ -172,7 +172,7 @@ public class Wine {
     ) async throws -> String {
         var result: [String] = []
         let fileHandle = try makeFileHandle()
-        fileHandle.writeApplicaitonInfo()
+        fileHandle.writeApplicationInfo()
         var environment = environment
 
         if let bottle = bottle {

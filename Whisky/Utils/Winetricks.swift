@@ -45,11 +45,43 @@ class Winetricks {
     static let winetricksURL: URL = WhiskyWineInstaller.libraryFolder
         .appending(path: "winetricks")
 
+    /// Search the app bundle first and then common PATH entries so public builds
+    /// can rely on an external `cabextract` install instead of redistributing it.
+    static func cabextractDirectory() -> URL? {
+        if let bundledDirectory = Bundle.main.url(forResource: "cabextract", withExtension: nil)?
+            .deletingLastPathComponent() {
+            return bundledDirectory
+        }
+
+        let pathEntries = (ProcessInfo.processInfo.environment["PATH"] ?? "")
+            .split(separator: ":")
+            .map(String.init)
+        let fallbackDirectories = ["/opt/homebrew/bin", "/usr/local/bin", "/usr/bin"]
+        for directory in pathEntries + fallbackDirectories {
+            let directoryURL = URL(fileURLWithPath: directory, isDirectory: true)
+            let executableURL = directoryURL.appending(path: "cabextract")
+            if FileManager.default.isExecutableFile(atPath: executableURL.path(percentEncoded: false)) {
+                return directoryURL
+            }
+        }
+
+        return nil
+    }
+
+    static func hasCabextract() -> Bool {
+        cabextractDirectory() != nil
+    }
+
+    /// Runs Winetricks in Terminal so the user can monitor long-running verbs
+    /// and interact with prompts that are still terminal-driven upstream.
     static func runCommand(command: String, bottle: Bottle) async {
-        guard let resourcesURL = Bundle.main.url(forResource: "cabextract", withExtension: nil)?
-            .deletingLastPathComponent() else { return }
+        guard let cabextractDirectory = cabextractDirectory() else {
+            await showMissingCabextractAlert()
+            return
+        }
+
         // swiftlint:disable:next line_length
-        let winetricksCmd = #"PATH=\"\#(WhiskyWineInstaller.binFolder.path):\#(resourcesURL.path(percentEncoded: false)):$PATH\" WINE=wine64 WINEPREFIX=\"\#(bottle.url.path)\" \"\#(winetricksURL.path(percentEncoded: false))\" \#(command)"#
+        let winetricksCmd = #"PATH=\"\#(WhiskyWineInstaller.binFolder.path):\#(cabextractDirectory.path(percentEncoded: false)):$PATH\" WINE=wine64 WINEPREFIX=\"\#(bottle.url.path)\" \"\#(winetricksURL.path(percentEncoded: false))\" \#(command)"#
 
         let script = """
         tell application "Terminal"
@@ -80,24 +112,42 @@ class Winetricks {
         }
     }
 
+    @MainActor
+    private static func showMissingCabextractAlert() {
+        let alert = NSAlert()
+        alert.messageText = String(localized: "winetricks.cabextract.title",
+                                   defaultValue: "cabextract is required for Winetricks")
+        alert.informativeText = String(
+            localized: "winetricks.cabextract.info",
+            defaultValue: "Install cabextract with Homebrew (`brew install cabextract`) and try again."
+        )
+        alert.alertStyle = .warning
+        alert.addButton(withTitle: String(localized: "button.ok"))
+        alert.runModal()
+    }
+
     static func parseVerbs() async -> [WinetricksCategory] {
-        // Grab the verbs file
+        // `verbs.txt` is distributed with the runtime and keeps the UI aligned
+        // with the actual Winetricks build available in the installed runtime.
         let verbsURL = WhiskyWineInstaller.libraryFolder.appending(path: "verbs.txt")
-        let verbs: String = await { () async -> String in
-            do {
-                let (data, _) = try await URLSession.shared.data(from: verbsURL)
-                return String(data: data, encoding: .utf8) ?? String()
-            } catch {
-                return String()
-            }
-        }()
+        let verbs: String
+        do {
+            verbs = try String(contentsOf: verbsURL, encoding: .utf8)
+        } catch {
+            return []
+        }
 
         // Read the file line by line
         let lines = verbs.components(separatedBy: "\n")
         var categories: [WinetricksCategory] = []
         var currentCategory: WinetricksCategory?
 
-        for line in lines {
+        for rawLine in lines {
+            let line = rawLine.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !line.isEmpty else {
+                continue
+            }
+
             // Categories are label as "===== <name> ====="
             if line.starts(with: "=====") {
                 // If we have a current category, add it to the list
@@ -108,8 +158,8 @@ class Winetricks {
                 // Create a new category
                 // Capitalize the first letter of the category name
                 let categoryName = line.replacingOccurrences(of: "=====", with: "").trimmingCharacters(in: .whitespaces)
-                if let cateogry = WinetricksCategories(rawValue: categoryName) {
-                    currentCategory = WinetricksCategory(category: cateogry,
+                if let category = WinetricksCategories(rawValue: categoryName) {
+                    currentCategory = WinetricksCategory(category: category,
                                                          verbs: [])
                 } else {
                     currentCategory = nil
@@ -121,9 +171,13 @@ class Winetricks {
 
                 // If we have a current category, add the verb to it
                 // Verbs eg. "3m_library               3M Cloud Library (3M Company, 2015) [downloadable]"
-                let verbName = line.components(separatedBy: " ")[0]
-                let verbDescription = line.replacingOccurrences(of: "\(verbName) ", with: "")
-                    .trimmingCharacters(in: .whitespaces)
+                let components = line.split(maxSplits: 1, whereSeparator: \.isWhitespace)
+                guard let verbName = components.first.map(String.init) else {
+                    continue
+                }
+                let verbDescription = components.count > 1
+                    ? String(components[1]).trimmingCharacters(in: .whitespaces)
+                    : ""
                 currentCategory?.verbs.append(WinetricksVerb(name: verbName, description: verbDescription))
             }
         }

@@ -41,6 +41,8 @@ struct ContentView: View {
 
     @State private var bottleFilter = ""
 
+    private var appDisplayName: String { Bundle.appDisplayName }
+
     var body: some View {
         NavigationSplitView {
             sidebar
@@ -120,14 +122,23 @@ struct ContentView: View {
                     }
 
                     let alert = NSAlert()
-                    alert.messageText = String(localized: "update.whiskywine.title")
+                    alert.messageText = String(
+                        localized: "update.whiskygptk.runtime.title",
+                        defaultValue: "New Runtime Available"
+                    )
                     alert.informativeText = String(
-                        format: String(localized: "update.whiskywine.description"),
+                        format: String(
+                            localized: "update.whiskygptk.runtime.description",
+                            defaultValue: "You are running runtime %@, but %@ is available. Would you like to update?"
+                        ),
                         String(WhiskyWineInstaller.whiskyWineVersion() ?? SemanticVersion(0, 0, 0)),
                         String(updateInfo.1)
                     )
                     alert.alertStyle = .warning
-                    alert.addButton(withTitle: String(localized: "update.whiskywine.update"))
+                    alert.addButton(withTitle: String(
+                        localized: "update.whiskygptk.runtime.update",
+                        defaultValue: "Update Runtime"
+                    ))
                     alert.addButton(withTitle: String(localized: "button.removeAlert.cancel"))
 
                     let response = alert.runModal()
@@ -224,9 +235,9 @@ struct ContentView: View {
         VStack(alignment: .leading, spacing: 16) {
             HStack(alignment: .top, spacing: 16) {
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("Whisky")
+                    Text(appDisplayName)
                         .font(.system(size: 30, weight: .bold, design: .rounded))
-                    Text("Bottled Windows compatibility for macOS")
+                    Text("Game Porting Toolkit-powered Windows compatibility for macOS")
                         .font(.headline)
                         .foregroundStyle(WhiskyBrandPalette.gold)
                     Text(currentRuntimeLabel)
