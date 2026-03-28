@@ -20,12 +20,12 @@ import Foundation
 import SemanticVersion
 import WhiskyKit
 
-// swiftlint:disable:next todo
-// TODO: Don't use unchecked!
 /// Shared bottle state for the SwiftUI app.
 ///
 /// Bottle creation is intentionally asynchronous because creating the prefix and
 /// querying the runtime version can block for a noticeable amount of time.
+/// `@unchecked Sendable` is used here because detached setup work captures this
+/// object, but all published UI mutations are marshalled back to `MainActor`.
 final class BottleVM: ObservableObject, @unchecked Sendable {
     @MainActor static let shared = BottleVM()
 
@@ -44,17 +44,29 @@ final class BottleVM: ObservableObject, @unchecked Sendable {
     /// Creates the bottle directory immediately and then finishes the heavier
     /// Wine prefix setup off the main thread. The URL is returned up front so
     /// the UI can select and scroll to the placeholder entry while setup runs.
-    func createNewBottle(bottleName: String, winVersion: WinVersion, bottleURL: URL) -> URL {
+    func createNewBottle(
+        bottleName: String,
+        winVersion: WinVersion,
+        runner: BottleRunner,
+        bottleURL: URL
+    ) -> URL {
         let newBottleDir = bottleURL.appending(path: UUID().uuidString)
 
         Task.detached {
             var bottleId: Bottle?
             do {
-                try FileManager.default.createDirectory(atPath: newBottleDir.path(percentEncoded: false),
-                                                        withIntermediateDirectories: true)
+                switch runner {
+                case .wine:
+                    try FileManager.default.createDirectory(atPath: newBottleDir.path(percentEncoded: false),
+                                                            withIntermediateDirectories: true)
+                case .dosbox:
+                    try DOSBox.createBottleLayout(at: newBottleDir)
+                }
+
                 let bottle = Bottle(bottleUrl: newBottleDir, inFlight: true)
                 bottleId = bottle
                 bottle.settings.name = bottleName
+                bottle.settings.bottleRunner = runner
                 bottle.settings.windowsVersion = winVersion
 
                 await MainActor.run {
@@ -64,12 +76,17 @@ final class BottleVM: ObservableObject, @unchecked Sendable {
                     self.bottles.append(bottle)
                 }
 
-                try await Wine.changeWinVersion(bottle: bottle, win: winVersion)
-                do {
-                    let wineVer = try await Wine.wineVersion()
-                    bottle.settings.wineVersion = SemanticVersion(wineVer) ?? SemanticVersion(0, 0, 0)
-                } catch {
-                    print("Failed to determine bottle wine version: \(error)")
+                switch runner {
+                case .wine:
+                    try await Wine.changeWinVersion(bottle: bottle, win: winVersion)
+                    do {
+                        let wineVer = try await Wine.wineVersion()
+                        bottle.settings.wineVersion = SemanticVersion(wineVer) ?? SemanticVersion(0, 0, 0)
+                    } catch {
+                        print("Failed to determine bottle wine version: \(error)")
+                    }
+                case .dosbox:
+                    try DOSBox.writeConfiguration(for: bottle)
                 }
 
                 await MainActor.run {

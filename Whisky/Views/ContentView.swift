@@ -42,6 +42,8 @@ struct ContentView: View {
     @State private var bottleFilter = ""
 
     private var appDisplayName: String { Bundle.appDisplayName }
+    private var wineBottleCount: Int { bottleVM.bottles.filter { $0.runner == .wine }.count }
+    private var dosboxBottleCount: Int { bottleVM.bottles.filter { $0.runner == .dosbox }.count }
 
     var body: some View {
         NavigationSplitView {
@@ -55,7 +57,7 @@ struct ContentView: View {
                     showBottleCreation.toggle()
                 } label: {
                     Image(systemName: "plus")
-                        .help("button.createBottle")
+                        .help("Create a new GPTK Wine bottle or DOSBox library.")
                 }
             }
             ToolbarItem(placement: .primaryAction) {
@@ -72,7 +74,7 @@ struct ContentView: View {
                     }
                 } label: {
                     Image(systemName: "arrow.triangle.2.circlepath")
-                        .help("button.refresh")
+                        .help("Refresh the bottle list and installed programs for the selected library.")
                         .rotationEffect(refreshAnimation)
                 }
             }
@@ -107,10 +109,10 @@ struct ContentView: View {
                 }
             }
 
-            if !WhiskyWineInstaller.isWhiskyWineInstalled() {
+            if !WhiskyWineInstaller.isWhiskyWineInstalled() && !DOSBox.isInstalled() {
                 showSetup = true
             }
-            if checkWhiskyWineUpdates {
+            if checkWhiskyWineUpdates && WhiskyWineInstaller.isWhiskyWineInstalled() {
                 let task = Task.detached {
                     return await WhiskyWineInstaller.shouldUpdateWhiskyWine()
                 }
@@ -237,7 +239,7 @@ struct ContentView: View {
                 VStack(alignment: .leading, spacing: 6) {
                     Text(appDisplayName)
                         .font(.system(size: 30, weight: .bold, design: .rounded))
-                    Text("Game Porting Toolkit-powered Windows compatibility for macOS")
+                    Text("macOS game launcher for GPTK Wine and DOSBox")
                         .font(.headline)
                         .foregroundStyle(WhiskyBrandPalette.gold)
                     Text(currentRuntimeLabel)
@@ -259,13 +261,18 @@ struct ContentView: View {
                         tint: .orange
                     )
                     WhiskyGlassBadge(
-                        icon: "bolt.fill",
-                        title: "\(bottleVM.countActive()) Active",
+                        icon: "wineglass.fill",
+                        title: "\(wineBottleCount) Wine",
+                        tint: .pink
+                    )
+                    WhiskyGlassBadge(
+                        icon: "opticaldiscdrive.fill",
+                        title: "\(dosboxBottleCount) DOSBox",
                         tint: .green
                     )
                     WhiskyGlassBadge(
                         icon: "arrow.down.circle",
-                        title: runtimeBadgeLabel,
+                        title: runnerBadgeLabel,
                         tint: .blue
                     )
                 }
@@ -277,13 +284,18 @@ struct ContentView: View {
                         tint: .orange
                     )
                     WhiskyGlassBadge(
-                        icon: "bolt.fill",
-                        title: "\(bottleVM.countActive()) Active",
+                        icon: "wineglass.fill",
+                        title: "\(wineBottleCount) Wine",
+                        tint: .pink
+                    )
+                    WhiskyGlassBadge(
+                        icon: "opticaldiscdrive.fill",
+                        title: "\(dosboxBottleCount) DOSBox",
                         tint: .green
                     )
                     WhiskyGlassBadge(
                         icon: "arrow.down.circle",
-                        title: runtimeBadgeLabel,
+                        title: runnerBadgeLabel,
                         tint: .blue
                     )
                 }
@@ -297,12 +309,14 @@ struct ContentView: View {
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.borderedProminent)
+                .help("Create a new GPTK Wine bottle or DOSBox game library.")
 
                 SettingsLink {
                     Label("Settings", systemImage: "slider.horizontal.3")
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.bordered)
+                .help("Open runtime, appearance, and project settings.")
             }
         }
         .whiskyGlassCard(cornerRadius: 30)
@@ -315,15 +329,16 @@ struct ContentView: View {
             VStack(spacing: 6) {
                 Text("No Bottles Yet")
                     .font(.system(size: 28, weight: .bold, design: .rounded))
-                Text("Create your first bottle to start installing Windows apps and games.")
+                Text("Create a GPTK Wine bottle for Windows games or a DOSBox library for classic DOS titles.")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
             }
 
             FlowLayout(spacing: 8) {
-                WhiskyGlassBadge(icon: "shippingbox", title: "Per-app bottles", tint: .orange)
+                WhiskyGlassBadge(icon: "shippingbox", title: "Per-game libraries", tint: .orange)
                 WhiskyGlassBadge(icon: "gamecontroller.fill", title: "GPTK runtime", tint: .blue)
+                WhiskyGlassBadge(icon: "opticaldiscdrive.fill", title: "DOSBox Staging", tint: .green)
                 WhiskyGlassBadge(icon: "sparkles", title: "Brand glass UI", tint: WhiskyBrandPalette.amber)
             }
 
@@ -335,6 +350,7 @@ struct ContentView: View {
                     .padding(.vertical, 6)
             }
             .buttonStyle(.borderedProminent)
+            .help("Create your first game library.")
         }
         .frame(maxWidth: 420)
         .whiskyGlassCard(cornerRadius: 30)
@@ -344,10 +360,18 @@ struct ContentView: View {
         WhiskyWineInstaller.whiskyWineVersion().map(String.init) ?? "Runtime Missing"
     }
 
+    private var runnerBadgeLabel: String {
+        if DOSBox.isInstalled(), let dosboxURL = DOSBox.executableURL() {
+            return dosboxURL.lastPathComponent
+        }
+        return runtimeBadgeLabel
+    }
+
     private var currentRuntimeLabel: String {
         let release = WhiskyWineInstaller.runtimeReleaseName() ?? runtimeBadgeLabel
         let source = WhiskyWineInstaller.runtimeSource() ?? "Runtime not installed"
-        return "\(release) via \(source)"
+        let dosboxSummary = DOSBox.executableURL()?.lastPathComponent ?? "DOSBox missing"
+        return "\(release) via \(source) • DOSBox: \(dosboxSummary)"
     }
 
     var filteredBottles: [Bottle] {

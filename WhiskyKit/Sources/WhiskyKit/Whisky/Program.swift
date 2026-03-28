@@ -20,8 +20,9 @@ import Foundation
 import SwiftUI
 import os.log
 
-// swiftlint:disable:next todo
-// TODO: Should not be unchecked!
+/// Programs are referenced by detached launch tasks, but stateful UI updates
+/// still happen on the main actor. `@unchecked Sendable` documents that intent
+/// without claiming the object is fully thread-safe by construction.
 public final class Program: ObservableObject, Equatable, Hashable, Identifiable, @unchecked Sendable {
     public let bottle: Bottle
     public let url: URL
@@ -81,7 +82,13 @@ public final class Program: ObservableObject, Equatable, Hashable, Identifiable,
     }
 
     public func generateEnvironment() -> [String: String] {
-        var environment = settings.environment
+        var environment = settings.environment.reduce(into: [String: String]()) { partialResult, entry in
+            guard entry.key.isPortableEnvironmentVariableName else {
+                Logger.wineKit.warning("Ignoring invalid environment variable name `\(entry.key)` for `\(self.name)`")
+                return
+            }
+            partialResult[entry.key] = entry.value
+        }
         if settings.locale != .auto {
             environment["LC_ALL"] = settings.locale.rawValue
         }

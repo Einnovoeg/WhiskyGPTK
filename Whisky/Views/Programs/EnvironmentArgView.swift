@@ -150,8 +150,12 @@ struct KeyItem: View {
                 .frame(maxHeight: .infinity)
                 .focused($focus, equals: .row(id: key.id, section: .key))
                 .onChange(of: key.key) {
-                    key.key = key.key.trimmingCharacters(in: .whitespacesAndNewlines)
+                    let trimmed = key.key.trimmingCharacters(in: .whitespacesAndNewlines)
+                    key.key = String(trimmed.unicodeScalars.filter { scalar in
+                        CharacterSet.alphanumerics.contains(scalar) || scalar == "_"
+                    })
                 }
+                .help("Use letters, numbers, and underscores for the environment variable name.")
                 .onSubmit {
                     // Try to move on to value
                     focus = .row(id: key.id, section: .value)
@@ -161,11 +165,12 @@ struct KeyItem: View {
                 .labelsHidden()
                 .frame(maxHeight: .infinity)
                 .focused($focus, equals: .row(id: key.id, section: .value))
+                .help("Set the value that will be injected when this program launches.")
             Button {
                 environmentKeys.removeAll(where: { $0.id == key.id })
             } label: {
                 Image(systemName: "xmark.circle.fill")
-                    .help("environment.remove")
+                    .help("Remove this environment variable override.")
             }
             .buttonStyle(.plain)
             .foregroundStyle(.secondary)

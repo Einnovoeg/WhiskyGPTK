@@ -35,19 +35,30 @@ struct BottleListEntry: View {
                 RoundedRectangle(cornerRadius: 14, style: .continuous)
                     .fill((isSelected && useGlassUI) ? Color.white.opacity(0.16) : Color.white.opacity(useGlassUI ? 0.08 : 0.0))
                     .frame(width: 36, height: 36)
-                Image(systemName: bottle.isAvailable ? "wineglass.fill" : "externaldrive.badge.xmark")
-                    .foregroundStyle(bottle.isAvailable ? Color.pink : Color.secondary)
+                Image(systemName: bottle.isAvailable ? bottle.runner.systemImage : "externaldrive.badge.xmark")
+                    .foregroundStyle(bottle.isAvailable ? runnerTint : Color.secondary)
             }
+            .help(bottle.isAvailable
+                  ? "Runner: \(bottle.runner.displayName)"
+                  : "This library is unavailable because its runtime is missing.")
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(name)
                     .fontWeight(.semibold)
                     .lineLimit(1)
                 HStack(spacing: 8) {
-                    Text(bottle.settings.windowsVersion.pretty())
-                    Text(bottle.settings.dxvk ? "DXVK" : "D3DMetal")
-                    if bottle.settings.avxEnabled {
-                        Text("AVX")
+                    Text(bottle.runner.shortDisplayName)
+                    if bottle.runner == .wine {
+                        Text(bottle.settings.windowsVersion.pretty())
+                        Text(bottle.settings.dxvk ? "DXVK" : "D3DMetal")
+                        if bottle.settings.avxEnabled {
+                            Text("AVX")
+                        }
+                    } else {
+                        Text(bottle.settings.dosboxCycles.displayName)
+                        if bottle.settings.dosboxStartupProgram != nil {
+                            Text("Auto Launch")
+                        }
                     }
                 }
                 .font(.caption)
@@ -144,6 +155,15 @@ struct BottleListEntry: View {
 
     private var isSelected: Bool {
         selected == bottle.url
+    }
+
+    private var runnerTint: Color {
+        switch bottle.runner {
+        case .wine:
+            return .pink
+        case .dosbox:
+            return .orange
+        }
     }
 
     func showRemoveAlert(bottle: Bottle) {

@@ -10,6 +10,7 @@ This fork includes modifications made after the upstream project was archived, i
 
 - updated GPTK/Wine runtime sourcing and installation logic
 - bottle-management and stability fixes
+- a DOSBox Staging runner path for DOS-era games
 - UI modernization for recent macOS releases
 - repository, licensing, and release-process cleanup
 - bundled notice and license resources for redistribution compliance

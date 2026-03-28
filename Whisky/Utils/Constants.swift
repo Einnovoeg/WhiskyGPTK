@@ -58,7 +58,7 @@ enum ProjectDocument {
 
 enum ProjectInfo {
     static let displayName = Bundle.appDisplayName
-    static let repositoryURL = URL(string: "https://github.com/Einnovoeg/Whisky-GPTK") ?? fallbackURL
+    static let repositoryURL = URL(string: "https://github.com/Einnovoeg/WhiskyGPTK") ?? fallbackURL
     static let releasesURL = repositoryURL.appending(path: "releases")
     static let issuesURL = repositoryURL.appending(path: "issues")
     static let fundingURL = URL(string: "https://buymeacoffee.com/einnovoeg") ?? fallbackURL

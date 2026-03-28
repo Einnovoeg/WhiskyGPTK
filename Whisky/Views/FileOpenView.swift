@@ -27,15 +27,20 @@ struct FileOpenView: View {
     @State private var selection: URL = URL(filePath: "")
     @Environment(\.dismiss) private var dismiss
 
+    private var availableBottles: [Bottle] {
+        bottles.filter(\.isAvailable)
+    }
+
     var body: some View {
         NavigationStack {
             Form {
                 Picker("run.bottle", selection: $selection) {
-                    ForEach(bottles, id: \.self) {
-                        Text($0.settings.name)
+                    ForEach(availableBottles, id: \.self) {
+                        Text("\($0.settings.name) · \($0.runner.displayName)")
                             .tag($0.url)
                     }
                 }
+                .help("Choose which runtime library should open this file.")
             }
             .frame(maxHeight: .infinity)
             .formStyle(.grouped)
@@ -46,12 +51,14 @@ struct FileOpenView: View {
                         dismiss()
                     }
                     .keyboardShortcut(.cancelAction)
+                    .help("Close this sheet without opening the selected file.")
                 }
                 ToolbarItem(placement: .primaryAction) {
                     Button("button.run") {
                         run()
                     }
                     .keyboardShortcut(.defaultAction)
+                    .help("Open this file with the selected library.")
                 }
             }
         }
@@ -60,14 +67,14 @@ struct FileOpenView: View {
         .onAppear {
             // Makes sure there are more than 0 bottles.
             // Otherwise, it will crash on the nil cascade
-            if bottles.count <= 0 {
+            if availableBottles.isEmpty {
                 dismiss()
                 return
             }
 
-            selection = bottles.first(where: { $0.url == currentBottle })?.url ?? bottles[0].url
+            selection = availableBottles.first(where: { $0.url == currentBottle })?.url ?? availableBottles[0].url
 
-            if bottles.count == 1 {
+            if availableBottles.count == 1 {
                 // If the user only has one bottle
                 // there's nothing for them to select
                 run()
@@ -76,14 +83,18 @@ struct FileOpenView: View {
     }
 
     func run() {
-        if let bottle = bottles.first(where: { $0.url == selection }) {
+        if let bottle = availableBottles.first(where: { $0.url == selection }) {
             Task.detached(priority: .userInitiated) {
                 do {
-                    if fileURL.pathExtension == "bat" {
-                        try await Wine.runBatchFile(url: fileURL,
-                                                    bottle: bottle)
-                    } else {
-                        try await Wine.runProgram(at: fileURL, bottle: bottle)
+                    switch bottle.runner {
+                    case .wine:
+                        if fileURL.pathExtension.lowercased() == "bat" {
+                            try await Wine.runBatchFile(url: fileURL, bottle: bottle)
+                        } else {
+                            try await Wine.runProgram(at: fileURL, bottle: bottle)
+                        }
+                    case .dosbox:
+                        try await DOSBox.run(bottle: bottle, programURL: fileURL)
                     }
                 } catch {
                     print(error)

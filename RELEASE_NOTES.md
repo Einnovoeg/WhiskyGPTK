@@ -1,32 +1,30 @@
-# Whisky GPTK 3.0.0
+# Whisky GPTK 3.2.0
 
-Release date: 2026-03-23
-Bundle version: 45
+Release date: 2026-03-28
+Bundle version: 47
 
-First maintained release of the Whisky GPTK fork.
+Security and publication cleanup release for the maintained Whisky GPTK fork.
 
 ## Highlights
 
-- Updated runtime sourcing to maintained GPTK releases from `Gcenx/game-porting-toolkit`
-- Added support for mounted local Apple GPTK runtimes and `redist` overlays
-- Renamed the shipped app product to `Whisky GPTK`
-- Modernized the macOS UI with optional glass styling and new brand assets
-- Fixed bottle registration/import issues and several archived-upstream reliability problems
-- Removed bundled `cabextract` from the repository and switched Winetricks to an external dependency model
-- Added changelog, dependency documentation, third-party notices, and release automation for the fork
-- Added maintained repository, issue tracker, release links, and support metadata for distributed builds
+- Hardened Terminal launch and install flows so AppleScript command strings remain escaped correctly
+- Hardened generated terminal commands so user-provided arguments and environment values are shell-escaped
+- Corrected DOSBox Staging config generation to current option names used by modern releases
+- Updated project metadata and links for publication from the new `Einnovoeg/WhiskyGPTK` repository
+- Tightened shortcut launcher permissions and expanded hover help across the main UI sheets and menus
+- Kept the dual-runner model and current GPTK runtime handling intact while tightening release and compliance metadata
 
 ## Upgrade Notes
 
 - Existing Whisky bottle data is migrated through legacy bundle identifier detection.
 - Winetricks now requires an external `cabextract` install:
   - `brew install cabextract`
+- DOS support requires an external DOSBox Staging install:
+  - `brew install dosbox-staging`
 - Public release artifacts are unsigned unless otherwise stated.
 
 ## Verification
 
-- Debug build succeeded
-- Release build succeeded
-- `WhiskyCmd --help` succeeded
-- App launch smoke test succeeded
-- Runtime resolution and install flow verified against current maintained GPTK packages
+- `swift build` for `WhiskyKit` succeeded
+- DOSBox Staging 0.82.2 accepted the generated config without invalid or deprecated-option warnings
+- DOSBox mounted the bottle-local `DOS Games` folder successfully during smoke testing

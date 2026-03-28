@@ -34,6 +34,7 @@ struct PinCreationView: View {
         NavigationStack {
             Form {
                 TextField("pin.name", text: $newPinName)
+                    .help("Choose the Quick Launch label shown for this pinned program.")
 
                 ActionView(
                     text: "pin.path",
@@ -64,6 +65,7 @@ struct PinCreationView: View {
                         dismiss()
                     }
                     .keyboardShortcut(.cancelAction)
+                    .help("Close this sheet without adding a pin.")
                 }
                 ToolbarItem(placement: .primaryAction) {
                     Button("pin.create") {
@@ -71,6 +73,7 @@ struct PinCreationView: View {
                     }
                     .keyboardShortcut(.defaultAction)
                     .disabled(newPinName.isEmpty || newPinURL == nil)
+                    .help("Add the selected executable to Quick Launch for this library.")
                     .alert("pin.error.title", isPresented: $isDuplicate) {
                     } message: {
                         Text("pin.error.duplicate.\(newPinURL?.lastPathComponent ?? "unknown")")

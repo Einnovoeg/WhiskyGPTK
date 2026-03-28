@@ -64,6 +64,7 @@ struct RosettaView: View {
                         exit(0)
                     }
                     .keyboardShortcut(.cancelAction)
+                    .help("Close setup without installing Rosetta.")
                     Spacer()
                     Button("setup.retry") {
                         installing = true
@@ -74,6 +75,7 @@ struct RosettaView: View {
                         }
                     }
                     .keyboardShortcut(.defaultAction)
+                    .help("Retry Rosetta installation.")
                 }
             }
         }

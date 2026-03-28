@@ -16,6 +16,17 @@ This repository also depends on third-party projects with their own licenses and
   - Gcenx/game-porting-toolkit: https://github.com/Gcenx/game-porting-toolkit
 - Apple Game Porting Toolkit local installations may also be used when present on the host system.
 - This repository does not ship Apple's Game Porting Toolkit installer images.
+- The runtime packages consumed by this fork are Wine-derived and remain subject to Wine's upstream license terms.
+
+### Wine
+
+- Project: Wine
+- Repository: https://gitlab.winehq.org/wine/wine
+- Mirror: https://github.com/wine-mirror/wine
+- License: LGPL-2.1-or-later
+- Credit: Wine project authors and contributors
+- Redistribution status in this repo: not bundled as source or binary
+- License notice copy: `LICENSES/Wine.txt`
 
 ## Embedded or Linked Dependencies
 
@@ -68,6 +79,15 @@ This repository also depends on third-party projects with their own licenses and
 - Homepage: https://www.cabextract.org.uk/
 - Usage: optional external dependency for Winetricks support
 - Redistribution status in this repo: not bundled
+
+### DOSBox Staging
+
+- Repository: https://github.com/dosbox-staging/dosbox-staging
+- License: GPL-2.0-or-later
+- Usage: optional external runtime for DOS game libraries
+- Redistribution status in this repo: not bundled
+- Credit: DOSBox Staging authors and contributors
+- License notice copy: `LICENSES/DOSBox-Staging.txt`
 
 ## Compliance Notes
 

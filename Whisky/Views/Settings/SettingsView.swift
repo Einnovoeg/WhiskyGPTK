@@ -34,6 +34,7 @@ struct SettingsView: View {
         localized: "settings.runtime.checking",
         defaultValue: "Checking latest runtime..."
     )
+    @State private var dosboxVersionSummary = "Detecting DOSBox..."
     @State private var runtimeActionMessage: String?
     @State private var isRefreshingRuntime = false
     @State private var isInstallingRuntime = false
@@ -58,6 +59,9 @@ struct SettingsView: View {
             defaultValue: "Unknown source"
         )
         return "\(version) · \(source)"
+    }
+    private var dosboxPathSummary: String {
+        DOSBox.executableURL()?.prettyPath() ?? "Not installed"
     }
 
     var body: some View {
@@ -124,12 +128,14 @@ struct SettingsView: View {
                         }
                     }
                 }
+                .help("Choose where newly created bottles and DOS libraries are stored by default.")
             }
             Section {
                 Toggle(
                     String(localized: "settings.toggle.glass", defaultValue: "Use glass effects"),
                     isOn: $useGlassUI
                 )
+                .help("Enable the newer glass treatment across the app.")
                 Toggle(
                     String(
                         localized: "settings.toggle.wrapShortcuts",
@@ -137,8 +143,47 @@ struct SettingsView: View {
                     ),
                     isOn: $wrapProgramShortcuts
                 )
+                .help("Apply Whisky GPTK styling when generating macOS shortcuts.")
             } header: {
                 Text(String(localized: "settings.appearance", defaultValue: "Appearance"))
+            }
+            Section("Runners") {
+                Text("GPTK Wine: \(runtimeSummary)")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Text("DOSBox: \(dosboxVersionSummary)")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                ActionView(
+                    text: "DOSBox executable",
+                    subtitle: dosboxPathSummary,
+                    actionName: "Choose"
+                ) {
+                    let panel = NSOpenPanel()
+                    panel.canChooseFiles = true
+                    panel.canChooseDirectories = false
+                    panel.allowsMultipleSelection = false
+                    panel.directoryURL = URL(fileURLWithPath: "/opt/homebrew/bin")
+                    panel.begin { result in
+                        if result == .OK, let url = panel.urls.first {
+                            DOSBox.setOverrideExecutableURL(url)
+                            Task {
+                                await refreshDOSBoxSummary()
+                            }
+                        }
+                    }
+                }
+                .help("Point Whisky GPTK at a specific DOSBox or DOSBox Staging binary.")
+                Button("Use Auto-Detected DOSBox") {
+                    DOSBox.setOverrideExecutableURL(nil)
+                    Task {
+                        await refreshDOSBoxSummary()
+                    }
+                }
+                .help("Clear the manual DOSBox path and fall back to standard macOS install locations.")
+                Text("Wine 11.0 improves WoW64 and synchronization upstream. On macOS, the Linux-only NTSYNC work does not apply, so this build keeps MSync for Wine bottles and uses DOSBox Staging for DOS-era titles.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
             Section("settings.updates") {
                 if hasAppUpdateFeed {
@@ -149,6 +194,7 @@ struct SettingsView: View {
                         ),
                         isOn: $whiskyUpdate
                     )
+                    .help("Check for newer Whisky GPTK application releases.")
                 } else {
                     Text(String(localized: "settings.appfeed.unconfigured",
                                 defaultValue: "App update feed is not configured for this build."))
@@ -162,17 +208,20 @@ struct SettingsView: View {
                     ),
                     isOn: $checkWhiskyWineUpdates
                 )
+                .help("Check for newer GPTK Wine runtime packages.")
                 Toggle(
                     String(localized: "settings.toggle.whiskywine.autoInstall",
                            defaultValue: "Automatically install runtime updates"),
                     isOn: $autoInstallWhiskyWineUpdates
                 )
                 .disabled(!checkWhiskyWineUpdates)
+                .help("Install newer GPTK runtime packages without prompting.")
                 Toggle(
                     String(localized: "settings.toggle.runtime.preferLocal",
                            defaultValue: "Prefer local mounted GPTK runtime"),
                     isOn: $preferLocalGPTKRuntime
                 )
+                .help("Prefer locally mounted Apple GPTK images when they are newer than the remote runtime.")
                 Text(
                     String(
                         format: String(
@@ -212,6 +261,7 @@ struct SettingsView: View {
                         }
                     }
                     .disabled(isRefreshingRuntime || isInstallingRuntime)
+                    .help("Fetch the latest GPTK runtime metadata now.")
 
                     Button(isInstallingRuntime
                            ? String(localized: "settings.runtime.installing", defaultValue: "Installing…")
@@ -221,6 +271,7 @@ struct SettingsView: View {
                         }
                     }
                     .disabled(isRefreshingRuntime || isInstallingRuntime || latestRuntimePackage == nil)
+                    .help("Download and install the latest GPTK runtime package.")
                 }
             }
             Section {
@@ -291,6 +342,7 @@ struct SettingsView: View {
         .frame(width: ViewWidth.medium)
         .task {
             await refreshLatestRuntime()
+            await refreshDOSBoxSummary()
         }
     }
 
@@ -369,6 +421,16 @@ struct SettingsView: View {
                 defaultValue: "Runtime installation failed."
             )
         await refreshLatestRuntime()
+    }
+
+    @MainActor
+    private func refreshDOSBoxSummary() async {
+        if let executableURL = DOSBox.executableURL() {
+            let version = (try? await DOSBox.version()) ?? executableURL.lastPathComponent
+            dosboxVersionSummary = "\(version) · \(executableURL.lastPathComponent)"
+        } else {
+            dosboxVersionSummary = "Not installed"
+        }
     }
 }
 

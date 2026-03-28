@@ -33,15 +33,21 @@
 - Game Porting Toolkit runtime
   - Automatically resolved from `Gcenx/game-porting-toolkit`, or
   - Detected from a locally mounted Apple Game Porting Toolkit installation
+- Wine-compatible helper tools expected by the selected GPTK runtime release
 
 ## Optional External Tools
 
 - `cabextract`
   - Required for Winetricks verbs in public builds
   - Install with `brew install cabextract`
+- DOSBox Staging
+  - Optional runner for DOS-era games and installers
+  - Install with `brew install dosbox-staging`
+  - Redistribution status in this repo: not bundled
 
 ## Notes
 
 - This repository does not vendor full Game Porting Toolkit archives.
+- This repository does not vendor DOSBox Staging binaries.
 - Runtime payloads are installed at first run or setup time.
 - Third-party license information is documented in `THIRD_PARTY_NOTICES.md` and `LICENSES/`.

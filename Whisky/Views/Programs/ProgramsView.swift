@@ -161,6 +161,7 @@ struct ProgramItemView: View {
             .buttonStyle(.plain)
             .foregroundColor(program.pinned ? .accentColor : .secondary)
             .opacity(program.pinned ? 1 : showButtons ? 1 : 0)
+            .help(program.pinned ? "Unpin this program from Quick Launch." : "Pin this program to Quick Launch.")
             Text(program.name)
                 .frame(maxWidth: .infinity, alignment: .leading)
             if showButtons {
@@ -181,14 +182,14 @@ struct ProgramItemView: View {
                 .labelStyle(.iconOnly)
                 .buttonStyle(.plain)
                 .foregroundStyle(.secondary)
-                .help("program.config")
+                .help("Open this program's settings.")
                 Button("button.run", systemImage: "play") {
                     program.run()
                 }
                 .labelStyle(.iconOnly)
                 .buttonStyle(.plain)
                 .foregroundStyle(.secondary)
-                .help("button.run")
+                .help("Launch this program.")
             }
         }
         .padding(4)
@@ -215,7 +216,7 @@ struct BlocklistItemView: View {
                 .symbolVariant(.fill.circle)
                 .buttonStyle(.plain)
                 .foregroundColor(.secondary)
-                .help("program.remove.blocklist")
+                .help("Remove this path from the blocklist.")
             }
         }
         .padding(4)

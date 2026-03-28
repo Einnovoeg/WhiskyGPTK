@@ -20,6 +20,51 @@ import Foundation
 import SemanticVersion
 import os.log
 
+/// Runtime families supported by a bottle.
+///
+/// This is intentionally narrow today: GPTK Wine for Windows software and
+/// DOSBox Staging for DOS software. Both the UI and the CLI branch on this.
+public enum BottleRunner: String, CaseIterable, Codable, Sendable {
+    case wine
+    case dosbox
+
+    public var displayName: String {
+        switch self {
+        case .wine:
+            return "GPTK Wine"
+        case .dosbox:
+            return "DOSBox"
+        }
+    }
+
+    public var shortDisplayName: String {
+        switch self {
+        case .wine:
+            return "Wine"
+        case .dosbox:
+            return "DOS"
+        }
+    }
+
+    public var systemImage: String {
+        switch self {
+        case .wine:
+            return "wineglass.fill"
+        case .dosbox:
+            return "opticaldiscdrive.fill"
+        }
+    }
+
+    public var creationSummary: String {
+        switch self {
+        case .wine:
+            return "Use Game Porting Toolkit and Wine for modern Windows games."
+        case .dosbox:
+            return "Use DOSBox Staging for DOS games, installers, and classic launchers."
+        }
+    }
+}
+
 public struct PinnedProgram: Codable, Hashable, Equatable {
     public var name: String
     public var url: URL?
@@ -89,6 +134,88 @@ public enum EnhancedSync: Codable, Equatable {
     case none, esync, msync
 }
 
+public enum DOSBoxCycles: String, CaseIterable, Codable, Sendable {
+    case auto
+    case max
+    case fixed8000
+    case fixed12000
+    case fixed20000
+
+    public var displayName: String {
+        switch self {
+        case .auto:
+            return "Auto"
+        case .max:
+            return "Max"
+        case .fixed8000:
+            return "Fixed 8000"
+        case .fixed12000:
+            return "Fixed 12000"
+        case .fixed20000:
+            return "Fixed 20000"
+        }
+    }
+
+    var cpuCyclesValue: String {
+        switch self {
+        case .auto:
+            return "3000"
+        case .max:
+            return "max"
+        case .fixed8000:
+            return "8000"
+        case .fixed12000:
+            return "12000"
+        case .fixed20000:
+            return "20000"
+        }
+    }
+}
+
+public enum DOSBoxCore: String, CaseIterable, Codable, Sendable {
+    case auto
+    case dynamic
+    case normal
+    case simple
+
+    public var displayName: String {
+        rawValue.capitalized
+    }
+}
+
+public enum DOSBoxScaler: String, CaseIterable, Codable, Sendable {
+    case none
+    case normal2x
+    case hq2x
+    case rgb3x
+
+    public var displayName: String {
+        switch self {
+        case .none:
+            return "None"
+        case .normal2x:
+            return "Sharp"
+        case .hq2x:
+            return "CRT Auto"
+        case .rgb3x:
+            return "Arcade Sharp"
+        }
+    }
+
+    var configValue: String {
+        switch self {
+        case .none:
+            return "none"
+        case .normal2x:
+            return "sharp"
+        case .hq2x:
+            return "crt-auto"
+        case .rgb3x:
+            return "crt-auto-arcade-sharp"
+        }
+    }
+}
+
 public struct BottleWineConfig: Codable, Equatable {
     static let defaultWineVersion = SemanticVersion(7, 7, 0)
     var wineVersion: SemanticVersion = Self.defaultWineVersion
@@ -143,32 +270,69 @@ public struct BottleDXVKConfig: Codable, Equatable {
     }
 }
 
+/// Per-bottle DOSBox settings that are safe to persist in metadata.
+///
+/// Advanced users can still edit the generated config file directly, but the
+/// common controls live here so the UI can expose them consistently.
+public struct BottleDOSBoxConfig: Codable, Equatable {
+    var fullscreen: Bool = false
+    var captureMouse: Bool = true
+    var cycles: DOSBoxCycles = .auto
+    var core: DOSBoxCore = .auto
+    var scaler: DOSBoxScaler = .none
+    var startupProgram: String?
+
+    public init() {}
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.fullscreen = try container.decodeIfPresent(Bool.self, forKey: .fullscreen) ?? false
+        self.captureMouse = try container.decodeIfPresent(Bool.self, forKey: .captureMouse) ?? true
+        self.cycles = try container.decodeIfPresent(DOSBoxCycles.self, forKey: .cycles) ?? .auto
+        self.core = try container.decodeIfPresent(DOSBoxCore.self, forKey: .core) ?? .auto
+        self.scaler = try container.decodeIfPresent(DOSBoxScaler.self, forKey: .scaler) ?? .none
+        self.startupProgram = try container.decodeIfPresent(String.self, forKey: .startupProgram)
+    }
+}
+
 public struct BottleSettings: Codable, Equatable {
     static let defaultFileVersion = SemanticVersion(1, 0, 0)
 
     var fileVersion: SemanticVersion = Self.defaultFileVersion
+    private var runner: BottleRunner
     private var info: BottleInfo
     private var wineConfig: BottleWineConfig
     private var metalConfig: BottleMetalConfig
     private var dxvkConfig: BottleDXVKConfig
+    private var dosboxConfig: BottleDOSBoxConfig
 
     public init() {
+        self.runner = .wine
         self.info = BottleInfo()
         self.wineConfig = BottleWineConfig()
         self.metalConfig = BottleMetalConfig()
         self.dxvkConfig = BottleDXVKConfig()
+        self.dosboxConfig = BottleDOSBoxConfig()
     }
 
     // swiftlint:disable line_length
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         self.fileVersion = try container.decodeIfPresent(SemanticVersion.self, forKey: .fileVersion) ?? Self.defaultFileVersion
+        self.runner = try container.decodeIfPresent(BottleRunner.self, forKey: .runner) ?? .wine
         self.info = try container.decodeIfPresent(BottleInfo.self, forKey: .info) ?? BottleInfo()
         self.wineConfig = try container.decodeIfPresent(BottleWineConfig.self, forKey: .wineConfig) ?? BottleWineConfig()
         self.metalConfig = try container.decodeIfPresent(BottleMetalConfig.self, forKey: .metalConfig) ?? BottleMetalConfig()
         self.dxvkConfig = try container.decodeIfPresent(BottleDXVKConfig.self, forKey: .dxvkConfig) ?? BottleDXVKConfig()
+        self.dosboxConfig = try container.decodeIfPresent(BottleDOSBoxConfig.self, forKey: .dosboxConfig) ?? BottleDOSBoxConfig()
     }
     // swiftlint:enable line_length
+
+    /// The runtime family that owns this bottle.
+    public var bottleRunner: BottleRunner {
+        get { runner }
+        set { runner = newValue }
+    }
 
     /// The name of this bottle
     public var name: String {
@@ -240,6 +404,40 @@ public struct BottleSettings: Codable, Equatable {
         set { dxvkConfig.dxvkHud = newValue }
     }
 
+    public var dosboxFullscreen: Bool {
+        get { dosboxConfig.fullscreen }
+        set { dosboxConfig.fullscreen = newValue }
+    }
+
+    public var dosboxCaptureMouse: Bool {
+        get { dosboxConfig.captureMouse }
+        set { dosboxConfig.captureMouse = newValue }
+    }
+
+    public var dosboxCycles: DOSBoxCycles {
+        get { dosboxConfig.cycles }
+        set { dosboxConfig.cycles = newValue }
+    }
+
+    public var dosboxCore: DOSBoxCore {
+        get { dosboxConfig.core }
+        set { dosboxConfig.core = newValue }
+    }
+
+    public var dosboxScaler: DOSBoxScaler {
+        get { dosboxConfig.scaler }
+        set { dosboxConfig.scaler = newValue }
+    }
+
+    /// Relative path inside the DOS games folder for the default startup program.
+    public var dosboxStartupProgram: String? {
+        get { dosboxConfig.startupProgram }
+        set {
+            let trimmedValue = newValue?.trimmingCharacters(in: .whitespacesAndNewlines)
+            dosboxConfig.startupProgram = trimmedValue?.isEmpty == true ? nil : trimmedValue
+        }
+    }
+
     @discardableResult
     public static func decode(from metadataURL: URL) throws -> BottleSettings {
         guard FileManager.default.fileExists(atPath: metadataURL.path(percentEncoded: false)) else {
@@ -278,6 +476,10 @@ public struct BottleSettings: Codable, Equatable {
 
     // swiftlint:disable:next cyclomatic_complexity
     public func environmentVariables(wineEnv: inout [String: String]) {
+        guard bottleRunner == .wine else {
+            return
+        }
+
         if dxvk {
             wineEnv.updateValue("dxgi,d3d9,d3d10core,d3d11=n,b", forKey: "WINEDLLOVERRIDES")
             switch dxvkHud {

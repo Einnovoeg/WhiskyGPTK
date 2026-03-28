@@ -49,11 +49,16 @@ struct RunningProcessesView: View {
                                 await fetchProcesses()
                             }
                         }
+                        .help("Refresh the list of Windows processes currently running in this bottle.")
                         Button("process.table.kill") {
                             Task.detached(priority: .userInitiated) {
                                 await killProcess()
                             }
                         }
+                        .disabled(selectedProcess == nil)
+                        .help(selectedProcess == nil
+                              ? "Select a process first."
+                              : "Force-terminate the selected Windows process.")
                     }
                     .padding()
                 }

@@ -30,14 +30,19 @@ extension Program {
     }
 
     func runInWine() {
-        let arguments = settings.arguments.split { $0.isWhitespace }.map(String.init)
+        let arguments = String.shellSplit(settings.arguments)
         let environment = generateEnvironment()
 
         Task.detached(priority: .userInitiated) {
             do {
-                try await Wine.runProgram(
-                    at: self.url, args: arguments, bottle: self.bottle, environment: environment
-                )
+                switch self.bottle.runner {
+                case .wine:
+                    try await Wine.runProgram(
+                        at: self.url, args: arguments, bottle: self.bottle, environment: environment
+                    )
+                case .dosbox:
+                    try await DOSBox.run(bottle: self.bottle, programURL: self.url, arguments: arguments)
+                }
             } catch {
                 await MainActor.run {
                     self.showRunError(message: error.localizedDescription)
@@ -47,18 +52,27 @@ extension Program {
     }
 
     public func generateTerminalCommand() -> String {
-        return Wine.generateRunCommand(
-            at: self.url, bottle: bottle, args: settings.arguments, environment: generateEnvironment()
-        )
+        switch bottle.runner {
+        case .wine:
+            return Wine.generateRunCommand(
+                at: self.url, bottle: bottle, args: settings.arguments, environment: generateEnvironment()
+            )
+        case .dosbox:
+            return DOSBox.generateRunCommand(
+                bottle: bottle,
+                programURL: self.url,
+                arguments: settings.arguments
+            )
+        }
     }
 
     public func runInTerminal() {
-        let wineCmd = generateTerminalCommand().replacingOccurrences(of: "\\", with: "\\\\")
+        let terminalCommand = generateTerminalCommand().appleScriptEscaped
 
         let script = """
         tell application "Terminal"
             activate
-            do script "\(wineCmd)"
+            do script "\(terminalCommand)"
         end tell
         """
 

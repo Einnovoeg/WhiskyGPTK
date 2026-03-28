@@ -35,6 +35,7 @@ struct ProgramView: View {
                         Text(locale.pretty()).id(locale)
                     }
                 }
+                .help("Override the program locale that is exported at launch time.")
                 VStack {
                     HStack {
                         Text("program.args")
@@ -44,6 +45,7 @@ struct ProgramView: View {
                         .textFieldStyle(.roundedBorder)
                         .font(.system(.body, design: .monospaced))
                         .labelsHidden()
+                        .help("Optional launch arguments. Quotes keep spaces inside a single argument.")
                 }
             }
             EnvironmentArgView(program: program, isExpanded: $envArgsSectionExpanded)
@@ -54,6 +56,7 @@ struct ProgramView: View {
                 Button("button.showInFinder") {
                     NSWorkspace.shared.activateFileViewerSelecting([program.url])
                 }
+                .help("Reveal this program in Finder.")
                 Button("button.createShortcut") {
                     let panel = NSSavePanel()
                     let applicationDir = FileManager.default.urls(for: .applicationDirectory, in: .localDomainMask)[0]
@@ -75,10 +78,12 @@ struct ProgramView: View {
                         }
                     }
                 }
+                .help("Create a macOS app shortcut that launches this program with its current runner.")
                 Button("button.run") {
                     programLoading = true
                     program.run()
                 }
+                .help("Launch this program now.")
                 .disabled(programLoading)
                 if programLoading {
                     Spacer()

@@ -94,6 +94,7 @@ struct WelcomeView: View {
                             exit(0)
                         }
                         .keyboardShortcut(.cancelAction)
+                        .help("Close setup without installing Rosetta or the GPTK runtime.")
                     }
                     Spacer()
                     Button(rosettaInstalled && runtimeInstalled ? "setup.done" : "setup.next") {
@@ -110,6 +111,9 @@ struct WelcomeView: View {
                         showSetup = false
                     }
                     .keyboardShortcut(.defaultAction)
+                    .help(rosettaInstalled && runtimeInstalled
+                          ? "Finish setup and open the app."
+                          : "Continue to the next required dependency step.")
                 }
             }
         }
@@ -170,6 +174,7 @@ struct InstallStatusView: View {
                     Button("setup.uninstall") {
                         uninstall()
                     }
+                    .help("Remove the installed GPTK runtime files from the app support directory.")
                 }
             }
         }

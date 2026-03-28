@@ -51,6 +51,7 @@ struct PinView: View {
         }
         .frame(width: 90, height: 90)
         .padding(10)
+        .help("Double-click to launch \(name).")
         .overlay {
             HStack {
                 Spacer()

@@ -31,6 +31,7 @@ struct SparkleView: View {
     var body: some View {
         Button("check.updates", action: updater.checkForUpdates)
             .disabled(!checkForUpdatesViewModel.canCheckForUpdates)
+            .help("Check GitHub release metadata for a newer Whisky GPTK app build.")
     }
 }
 

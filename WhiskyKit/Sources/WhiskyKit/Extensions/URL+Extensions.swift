@@ -28,6 +28,77 @@ extension String {
         }
         return str
     }
+
+    /// Environment variable names are restricted before shell generation so
+    /// user-editable keys cannot inject additional shell syntax.
+    public var isPortableEnvironmentVariableName: Bool {
+        range(of: #"^[A-Za-z_][A-Za-z0-9_]*$"#, options: .regularExpression) != nil
+    }
+
+    /// Splits a user-entered argument string using lightweight shell-style rules.
+    ///
+    /// Quotes group whitespace, backslashes escape the next character, and any
+    /// unfinished quote is treated as literal input so the user can still see
+    /// what will be passed through rather than silently losing characters.
+    public static func shellSplit(_ raw: String) -> [String] {
+        var arguments: [String] = []
+        var current = ""
+        var quote: Character?
+        var iterator = raw.makeIterator()
+
+        while let char = iterator.next() {
+            if char == "\\" {
+                if let next = iterator.next() {
+                    current.append(next)
+                } else {
+                    current.append(char)
+                }
+                continue
+            }
+
+            if let activeQuote = quote {
+                if char == activeQuote {
+                    quote = nil
+                } else {
+                    current.append(char)
+                }
+                continue
+            }
+
+            switch char {
+            case "\"", "'":
+                quote = char
+            case _ where char.isWhitespace:
+                appendCompletedArgument(&arguments, current: &current)
+            default:
+                current.append(char)
+            }
+        }
+
+        if let quote {
+            current.insert(quote, at: current.startIndex)
+        }
+        appendCompletedArgument(&arguments, current: &current)
+        return arguments
+    }
+
+    /// Escapes a shell command for embedding inside an AppleScript string.
+    ///
+    /// Several UI actions send shell commands to Terminal via `do script`.
+    /// Those commands are already shell-escaped, but they still need a second
+    /// escaping pass so quotes and backslashes do not break the surrounding
+    /// AppleScript string literal.
+    public var appleScriptEscaped: String {
+        self
+            .replacingOccurrences(of: "\\", with: "\\\\")
+            .replacingOccurrences(of: "\"", with: "\\\"")
+    }
+
+    private static func appendCompletedArgument(_ arguments: inout [String], current: inout String) {
+        guard !current.isEmpty else { return }
+        arguments.append(current)
+        current.removeAll(keepingCapacity: true)
+    }
 }
 
 extension URL {

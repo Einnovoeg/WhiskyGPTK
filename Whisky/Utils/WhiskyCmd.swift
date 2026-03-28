@@ -25,11 +25,10 @@ class WhiskyCmd {
 
         if let whiskyCmdURL = whiskyCmdURL {
             let escapedPath = whiskyCmdURL.path(percentEncoded: false).replacingOccurrences(of: "'", with: "'\\''")
-            // swiftlint:disable line_length
+            let shellCommand = "ln -fs '\(escapedPath)' /usr/local/bin/whisky"
             let script = """
-            do shell script "ln -fs '\(escapedPath)' /usr/local/bin/whisky" with administrator privileges
+            do shell script "\(shellCommand.appleScriptEscaped)" with administrator privileges
             """
-            // swiftlint:enable line_length
 
             var error: NSDictionary?
             // Use AppleScript because somehow in 2023 Apple doesn't have good privileged file ops APIs

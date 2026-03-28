@@ -23,6 +23,8 @@ import Progress
 import SemanticVersion
 import ArgumentParser
 
+extension BottleRunner: ExpressibleByArgument {}
+
 @main
 struct Whisky: ParsableCommand {
     static let configuration = CommandConfiguration(
@@ -48,13 +50,18 @@ extension Whisky {
             let bottles = bottlesList.loadBottles()
 
             let nameCol = TextTableColumn(header: "Name")
-            let winVerCol = TextTableColumn(header: "Windows Version")
+            let runnerCol = TextTableColumn(header: "Runner")
+            let profileCol = TextTableColumn(header: "Profile")
             let pathCol = TextTableColumn(header: "Path")
 
-            var table = TextTable(columns: [nameCol, winVerCol, pathCol])
+            var table = TextTable(columns: [nameCol, runnerCol, profileCol, pathCol])
             for bottle in bottles {
+                let profile = bottle.runner == .wine
+                    ? bottle.settings.windowsVersion.pretty()
+                    : bottle.settings.dosboxCycles.displayName
                 table.addRow(values: [bottle.settings.name,
-                                      bottle.settings.windowsVersion.pretty(),
+                                      bottle.runner.displayName,
+                                      profile,
                                       bottle.url.prettyPath()])
             }
 
@@ -66,24 +73,33 @@ extension Whisky {
         static let configuration = CommandConfiguration(abstract: "Create a new bottle.")
 
         @Argument var name: String
+        @Option(name: .shortAndLong, help: "Runner to use: wine or dosbox.") var runner: BottleRunner = .wine
 
         mutating func run() throws {
             let bottleURL = BottleData.defaultBottleDir.appending(path: UUID().uuidString)
 
             do {
-                try FileManager.default.createDirectory(atPath: bottleURL.path(percentEncoded: false),
-                                                        withIntermediateDirectories: true)
+                switch runner {
+                case .wine:
+                    try FileManager.default.createDirectory(atPath: bottleURL.path(percentEncoded: false),
+                                                            withIntermediateDirectories: true)
+                case .dosbox:
+                    try DOSBox.createBottleLayout(at: bottleURL)
+                }
+
                 let bottle = Bottle(bottleUrl: bottleURL, inFlight: true)
                 // Should allow customisation
+                bottle.settings.bottleRunner = runner
                 bottle.settings.windowsVersion = .win10
                 bottle.settings.name = name
-//                try await Wine.changeWinVersion(bottle: bottle, win: winVersion)
-//                let wineVer = try await Wine.wineVersion()
                 bottle.settings.wineVersion = SemanticVersion(0, 0, 0)
+                if runner == .dosbox {
+                    try DOSBox.writeConfiguration(for: bottle)
+                }
 
                 var bottlesList = BottleData()
                 _ = bottlesList.registerBottlePath(bottleURL)
-                print("Created new bottle \"\(name)\".")
+                print("Created new \(runner.displayName) bottle \"\(name)\".")
             } catch {
                 throw ValidationError("\(error)")
             }
@@ -195,7 +211,17 @@ extension Whisky {
                 throw ValidationError("A bottle with that name doesn't exist.")
             }
 
-            let envCmd = Wine.generateTerminalEnvironmentCommand(bottle: bottle)
+            let envCmd: String
+            switch bottle.runner {
+            case .wine:
+                envCmd = Wine.generateTerminalEnvironmentCommand(bottle: bottle)
+            case .dosbox:
+                let alias = DOSBox.executableURL()?.path ?? "dosbox-staging"
+                envCmd = """
+                cd \"\(bottle.dosGamesFolder.path(percentEncoded: false))\"
+                alias dosbox=\"\(alias)\"
+                """
+            }
             print(envCmd)
 
         }

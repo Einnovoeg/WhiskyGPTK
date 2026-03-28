@@ -20,8 +20,9 @@ import Foundation
 import SwiftUI
 import os.log
 
-// swiftlint:disable:next todo
-// TODO: Should not be unchecked!
+/// Bottle models cross async task boundaries while still publishing on the main
+/// actor, so the type keeps `@unchecked Sendable` with explicit main-thread UI
+/// updates instead of pretending the whole object graph is value-safe.
 public final class Bottle: ObservableObject, Equatable, Hashable, Identifiable, Comparable, @unchecked Sendable {
     public let url: URL
     private let metadataURL: URL
@@ -31,6 +32,29 @@ public final class Bottle: ObservableObject, Equatable, Hashable, Identifiable, 
     @Published public var programs: [Program] = []
     @Published public var inFlight: Bool = false
     public var isAvailable: Bool = false
+
+    /// Folder mounted as `C:` inside DOSBox bottles.
+    public var dosGamesFolder: URL {
+        url.appending(path: "DOS Games")
+    }
+
+    /// Config file persisted alongside DOSBox bottles so advanced users can inspect it directly.
+    public var dosboxConfigURL: URL {
+        url.appending(path: "dosbox-staging.conf")
+    }
+
+    public var runner: BottleRunner {
+        settings.bottleRunner
+    }
+
+    public var isRunnerInstalled: Bool {
+        switch runner {
+        case .wine:
+            return WhiskyWineInstaller.isWhiskyWineInstalled()
+        case .dosbox:
+            return DOSBox.isInstalled()
+        }
+    }
 
     /// All pins with their associated programs
     public var pinnedPrograms: [(pin: PinnedProgram, program: Program, // swiftlint:disable:this large_tuple
@@ -73,6 +97,10 @@ public final class Bottle: ObservableObject, Equatable, Hashable, Identifiable, 
             }
             let legallyRemoved = pin.removable && volume == nil
             return FileManager.default.fileExists(atPath: urlPath) || legallyRemoved
+        }
+
+        if self.isAvailable {
+            self.isAvailable = isRunnerInstalled
         }
     }
 

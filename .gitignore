@@ -8,6 +8,7 @@ build/
 Build/
 BuildVerify/
 BuildVerifyFinal/
+BuildVerifyNoExplicit/
 DerivedData/
 *.xcworkspace
 xcuserdata/

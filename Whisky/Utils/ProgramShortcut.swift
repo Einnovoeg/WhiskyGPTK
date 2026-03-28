@@ -28,9 +28,10 @@ class ProgramShortcut {
         do {
             try FileManager.default.createDirectory(at: macos, withIntermediateDirectories: true)
 
-            // First create shell script
+            // Build a tiny launcher script inside the generated app bundle. The
+            // script stays minimal so the shortcut remains easy to inspect.
             let script = """
-            #!/bin/bash
+            #!/bin/sh
             \(program.generateTerminalCommand())
             """
             let scriptUrl = macos.appending(path: "launch")
@@ -38,8 +39,8 @@ class ProgramShortcut {
                              atomically: false,
                              encoding: .utf8)
 
-            // Make shell script runable
-            try FileManager.default.setAttributes([.posixPermissions: 0o777],
+            // The launcher only needs to be executable, not world-writable.
+            try FileManager.default.setAttributes([.posixPermissions: 0o755],
                                                   ofItemAtPath: scriptUrl.path(percentEncoded: false))
 
             // Create Info.plist (set category for Game mode)
@@ -66,7 +67,7 @@ class ProgramShortcut {
                            atomically: false,
                            encoding: .utf8)
 
-            // Set bundle icon
+            // Render a consistent icon so shortcuts are visually grouped with the app.
             let request = QLThumbnailGenerator.Request(fileAt: program.url,
                                                        size: CGSize(width: 512, height: 512),
                                                        scale: 2.0,

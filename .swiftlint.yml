@@ -1,9 +1,32 @@
+included:
+  - Whisky
+  - WhiskyCmd
+  - WhiskyKit
+  - WhiskyThumbnail
+
 opt_in_rules:
   - force_unwrapping
   - file_header
 
+disabled_rules:
+  - cyclomatic_complexity
+  - file_length
+  - function_body_length
+  - nesting
+  - superfluous_disable_command
+  - type_body_length
+
 excluded:
   - .build
+  - Build
+  - DerivedData
+  - BundledGPTK
+  - WhiskyKit/.build
+  - WhiskyKit/.swiftpm
+
+line_length:
+  warning: 220
+  error: 320
 
 file_header:
     severity: error

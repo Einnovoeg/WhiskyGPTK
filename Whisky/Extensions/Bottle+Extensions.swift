@@ -23,7 +23,14 @@ import os.log
 
 extension Bottle {
     func openCDrive() {
-        let cDriveURL = url.appending(path: "drive_c")
+        let cDriveURL: URL
+        switch runner {
+        case .wine:
+            cDriveURL = url.appending(path: "drive_c")
+        case .dosbox:
+            cDriveURL = dosGamesFolder
+        }
+
         do {
             try FileManager.default.createDirectory(at: cDriveURL, withIntermediateDirectories: true)
         } catch {
@@ -35,34 +42,46 @@ extension Bottle {
     }
 
     func openTerminal() {
-        let whiskyCmdURL = Bundle.main.url(forResource: "WhiskyCmd", withExtension: nil)
-        if let whiskyCmdURL = whiskyCmdURL {
+        let command: String?
+
+        switch runner {
+        case .wine:
+            guard let whiskyCmdURL = Bundle.main.url(forResource: "WhiskyCmd", withExtension: nil) else { return }
             let whiskyCmd = whiskyCmdURL.path(percentEncoded: false)
-            let cmd = "eval \\\"$(\\\"\(whiskyCmd)\\\" shellenv \\\"\(settings.name)\\\")\\\""
+            command = "eval \\\"$(\(whiskyCmd.esc) shellenv \(settings.name.esc))\\\""
+        case .dosbox:
+            let dosboxCommand = DOSBox.generateRunCommand(bottle: self)
+            command = "cd \(dosGamesFolder.path.esc); echo \"DOSBox shell ready for \(settings.name.esc).\"; echo \"Run: \(dosboxCommand.replacingOccurrences(of: "\"", with: "\\\""))\""
+        }
 
-            let script = """
-            tell application "Terminal"
-            activate
-            do script "\(cmd)"
-            end tell
-            """
+        guard let command else { return }
 
-            Task.detached(priority: .userInitiated) {
-                var error: NSDictionary?
-                guard let appleScript = NSAppleScript(source: script) else { return }
-                appleScript.executeAndReturnError(&error)
+        let script = """
+        tell application "Terminal"
+        activate
+        do script "\(command.appleScriptEscaped)"
+        end tell
+        """
 
-                if let error = error {
-                    Logger.wineKit.error("Failed to run terminal script \(error)")
-                    guard let description = error["NSAppleScriptErrorMessage"] as? String else { return }
-                    await self.showRunError(message: String(describing: description))
-                }
+        Task.detached(priority: .userInitiated) {
+            var error: NSDictionary?
+            guard let appleScript = NSAppleScript(source: script) else { return }
+            appleScript.executeAndReturnError(&error)
+
+            if let error = error {
+                Logger.wineKit.error("Failed to run terminal script \(error)")
+                guard let description = error["NSAppleScriptErrorMessage"] as? String else { return }
+                await self.showRunError(message: String(describing: description))
             }
         }
     }
 
     @discardableResult
     func getStartMenuPrograms() -> [Program] {
+        guard runner == .wine else {
+            return []
+        }
+
         let globalStartMenu = url
             .appending(path: "drive_c")
             .appending(path: "ProgramData")
@@ -121,18 +140,37 @@ extension Bottle {
     }
 
     func updateInstalledPrograms() {
-        let driveC = url.appending(path: "drive_c")
         var programs: [Program] = []
         var foundURLS: Set<URL> = []
 
-        for folderName in ["Program Files", "Program Files (x86)"] {
-            let folderURL = driveC.appending(path: folderName)
+        switch runner {
+        case .wine:
+            let driveC = url.appending(path: "drive_c")
+
+            for folderName in ["Program Files", "Program Files (x86)"] {
+                let folderURL = driveC.appending(path: folderName)
+                let enumerator = FileManager.default.enumerator(
+                    at: folderURL, includingPropertiesForKeys: [.isExecutableKey], options: [.skipsHiddenFiles]
+                )
+
+                while let url = enumerator?.nextObject() as? URL {
+                    guard !url.hasDirectoryPath && url.pathExtension == "exe" else { continue }
+                    guard !settings.blocklist.contains(url) else { continue }
+                    foundURLS.insert(url)
+                    programs.append(Program(url: url, bottle: self))
+                }
+            }
+        case .dosbox:
             let enumerator = FileManager.default.enumerator(
-                at: folderURL, includingPropertiesForKeys: [.isExecutableKey], options: [.skipsHiddenFiles]
+                at: dosGamesFolder,
+                includingPropertiesForKeys: [.isRegularFileKey],
+                options: [.skipsHiddenFiles]
             )
 
             while let url = enumerator?.nextObject() as? URL {
-                guard !url.hasDirectoryPath && url.pathExtension == "exe" else { continue }
+                guard !url.hasDirectoryPath else { continue }
+                let ext = url.pathExtension.lowercased()
+                guard ["exe", "com", "bat"].contains(ext) else { continue }
                 guard !settings.blocklist.contains(url) else { continue }
                 foundURLS.insert(url)
                 programs.append(Program(url: url, bottle: self))

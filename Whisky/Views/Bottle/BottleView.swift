@@ -56,48 +56,23 @@ struct BottleView: View {
             .bottomBar {
                 HStack {
                     Spacer()
-                    Button("button.cDrive") {
+                    Button(openFolderButtonTitle) {
                         bottle.openCDrive()
                     }
+                    .help(openFolderButtonHelp)
                     Button("button.terminal") {
                         bottle.openTerminal()
                     }
+                    .help(terminalHelp)
                     Button("button.winetricks") {
                         showWinetricksSheet.toggle()
                     }
-                    .disabled(!WhiskyWineInstaller.hasWinetricksRuntime())
-                    Button("button.run") {
-                        let panel = NSOpenPanel()
-                        panel.allowsMultipleSelection = false
-                        panel.canChooseDirectories = false
-                        panel.canChooseFiles = true
-                        panel.allowedContentTypes = [UTType.exe,
-                                                     UTType(exportedAs: "com.microsoft.msi-installer"),
-                                                     UTType(exportedAs: "com.microsoft.bat")]
-                        panel.directoryURL = bottle.url.appending(path: "drive_c")
-                        panel.begin { result in
-                            programLoading = true
-                            Task(priority: .userInitiated) {
-                                if result == .OK {
-                                    if let url = panel.urls.first {
-                                        do {
-                                            if url.pathExtension == "bat" {
-                                                try await Wine.runBatchFile(url: url, bottle: bottle)
-                                            } else {
-                                                try await Wine.runProgram(at: url, bottle: bottle)
-                                            }
-                                        } catch {
-                                            print("Failed to run external program: \(error)")
-                                        }
-                                        programLoading = false
-                                    }
-                                } else {
-                                    programLoading = false
-                                }
-                                updateStartMenu()
-                            }
-                        }
+                    .help("Install helper components for Wine bottles.")
+                    .disabled(bottle.runner != .wine || !WhiskyWineInstaller.hasWinetricksRuntime())
+                    Button(primaryLaunchTitle) {
+                        openRunPicker()
                     }
+                    .help(primaryLaunchHelp)
                     .disabled(programLoading)
                     if programLoading {
                         Spacer()
@@ -158,33 +133,54 @@ struct BottleView: View {
 
             ViewThatFits {
                 HStack(spacing: 8) {
-                    WhiskyGlassBadge(icon: "desktopcomputer", title: bottle.settings.windowsVersion.pretty(), tint: .blue)
-                    WhiskyGlassBadge(icon: bottle.settings.dxvk ? "bolt.fill" : "sparkles", title: renderLabel, tint: bottle.settings.dxvk ? .orange : .green)
-                    WhiskyGlassBadge(icon: "speedometer", title: syncLabel, tint: .pink)
+                    WhiskyGlassBadge(icon: bottle.runner.systemImage, title: bottle.runner.displayName, tint: .orange)
+                    if bottle.runner == .wine {
+                        WhiskyGlassBadge(icon: "desktopcomputer", title: bottle.settings.windowsVersion.pretty(), tint: .blue)
+                        WhiskyGlassBadge(icon: bottle.settings.dxvk ? "bolt.fill" : "sparkles", title: renderLabel, tint: bottle.settings.dxvk ? .orange : .green)
+                        WhiskyGlassBadge(icon: "speedometer", title: syncLabel, tint: .pink)
+                    } else {
+                        WhiskyGlassBadge(icon: "gamecontroller.fill", title: "DOS Games", tint: .green)
+                        WhiskyGlassBadge(icon: "terminal.fill", title: bottle.settings.dosboxCycles.displayName, tint: .pink)
+                    }
                 }
                 VStack(alignment: .leading, spacing: 8) {
-                    WhiskyGlassBadge(icon: "desktopcomputer", title: bottle.settings.windowsVersion.pretty(), tint: .blue)
-                    WhiskyGlassBadge(icon: bottle.settings.dxvk ? "bolt.fill" : "sparkles", title: renderLabel, tint: bottle.settings.dxvk ? .orange : .green)
-                    WhiskyGlassBadge(icon: "speedometer", title: syncLabel, tint: .pink)
+                    WhiskyGlassBadge(icon: bottle.runner.systemImage, title: bottle.runner.displayName, tint: .orange)
+                    if bottle.runner == .wine {
+                        WhiskyGlassBadge(icon: "desktopcomputer", title: bottle.settings.windowsVersion.pretty(), tint: .blue)
+                        WhiskyGlassBadge(icon: bottle.settings.dxvk ? "bolt.fill" : "sparkles", title: renderLabel, tint: bottle.settings.dxvk ? .orange : .green)
+                        WhiskyGlassBadge(icon: "speedometer", title: syncLabel, tint: .pink)
+                    } else {
+                        WhiskyGlassBadge(icon: "gamecontroller.fill", title: "DOS Games", tint: .green)
+                        WhiskyGlassBadge(icon: "terminal.fill", title: bottle.settings.dosboxCycles.displayName, tint: .pink)
+                    }
                 }
             }
 
             HStack(spacing: 10) {
-                Button("button.cDrive") {
+                Button(openFolderButtonTitle) {
                     bottle.openCDrive()
                 }
                 .buttonStyle(.borderedProminent)
+                .help(openFolderButtonHelp)
 
                 Button("button.terminal") {
                     bottle.openTerminal()
                 }
                 .buttonStyle(.bordered)
+                .help(terminalHelp)
 
                 Button("button.winetricks") {
                     showWinetricksSheet.toggle()
                 }
                 .buttonStyle(.bordered)
-                .disabled(!WhiskyWineInstaller.hasWinetricksRuntime())
+                .help("Install helper components for Wine bottles.")
+                .disabled(bottle.runner != .wine || !WhiskyWineInstaller.hasWinetricksRuntime())
+
+                Button(primaryLaunchTitle) {
+                    openRunPicker()
+                }
+                .buttonStyle(.bordered)
+                .help(primaryLaunchHelp)
             }
         }
         .whiskyGlassCard(cornerRadius: 30)
@@ -240,6 +236,35 @@ struct BottleView: View {
         bottle.settings.dxvk ? "DXVK Enabled" : "D3DMetal"
     }
 
+    private var openFolderButtonTitle: LocalizedStringKey {
+        bottle.runner == .wine ? "button.cDrive" : "Open DOS Games"
+    }
+
+    private var openFolderButtonHelp: String {
+        bottle.runner == .wine
+        ? "Open the Wine C: drive in Finder."
+        : "Open the DOS Games folder mounted as drive C: in DOSBox."
+    }
+
+    private var terminalHelp: String {
+        bottle.runner == .wine
+        ? "Open a Terminal session with the bottle environment loaded."
+        : "Open Terminal in the DOS Games folder and show the DOSBox command."
+    }
+
+    private var primaryLaunchTitle: LocalizedStringKey {
+        if bottle.runner == .dosbox, bottle.settings.dosboxStartupProgram != nil {
+            return "Launch Default Game"
+        }
+        return "button.run"
+    }
+
+    private var primaryLaunchHelp: String {
+        bottle.runner == .wine
+        ? "Browse for a Windows installer or executable and run it in this bottle."
+        : "Launch DOSBox, optionally starting the default DOS game configured for this library."
+    }
+
     private var syncLabel: String {
         switch bottle.settings.enhancedSync {
         case .none:
@@ -254,6 +279,10 @@ struct BottleView: View {
     private func updateStartMenu() {
         bottle.updateInstalledPrograms()
 
+        guard bottle.runner == .wine else {
+            return
+        }
+
         let startMenuPrograms = bottle.getStartMenuPrograms()
         for startMenuProgram in startMenuPrograms {
             for program in bottle.programs where
@@ -265,6 +294,59 @@ struct BottleView: View {
                     name: program.url.deletingPathExtension().lastPathComponent,
                     url: program.url
                 ))
+            }
+        }
+    }
+
+    private func openRunPicker() {
+        let panel = NSOpenPanel()
+        panel.allowsMultipleSelection = false
+        panel.canChooseDirectories = false
+        panel.canChooseFiles = true
+
+        switch bottle.runner {
+        case .wine:
+            panel.allowedContentTypes = [
+                UTType.exe,
+                UTType(exportedAs: "com.microsoft.msi-installer"),
+                UTType(exportedAs: "com.microsoft.bat")
+            ]
+            panel.directoryURL = bottle.url.appending(path: "drive_c")
+        case .dosbox:
+            panel.allowedContentTypes = [
+                UTType(filenameExtension: "exe") ?? .data,
+                UTType(filenameExtension: "com") ?? .data,
+                UTType(filenameExtension: "bat") ?? .data
+            ]
+            panel.directoryURL = bottle.dosGamesFolder
+        }
+
+        panel.begin { result in
+            programLoading = true
+            Task(priority: .userInitiated) {
+                defer {
+                    programLoading = false
+                    updateStartMenu()
+                }
+
+                guard result == .OK, let url = panel.urls.first else {
+                    return
+                }
+
+                do {
+                    switch bottle.runner {
+                    case .wine:
+                        if url.pathExtension.lowercased() == "bat" {
+                            try await Wine.runBatchFile(url: url, bottle: bottle)
+                        } else {
+                            try await Wine.runProgram(at: url, bottle: bottle)
+                        }
+                    case .dosbox:
+                        try await DOSBox.run(bottle: bottle, programURL: url)
+                    }
+                } catch {
+                    print("Failed to launch program: \(error)")
+                }
             }
         }
     }

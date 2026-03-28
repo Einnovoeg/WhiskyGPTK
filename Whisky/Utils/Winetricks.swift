@@ -86,7 +86,7 @@ class Winetricks {
         let script = """
         tell application "Terminal"
             activate
-            do script "\(winetricksCmd)"
+            do script "\(winetricksCmd.appleScriptEscaped)"
         end tell
         """
 

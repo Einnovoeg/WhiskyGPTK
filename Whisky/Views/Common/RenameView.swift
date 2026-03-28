@@ -35,6 +35,7 @@ struct RenameView: View {
         NavigationStack {
             Form {
                 TextField("rename.name", text: $name)
+                    .help("Enter the updated display name.")
             }
             .formStyle(.grouped)
             .navigationTitle(title)
@@ -44,6 +45,7 @@ struct RenameView: View {
                         dismiss()
                     }
                     .keyboardShortcut(.cancelAction)
+                    .help("Close this sheet without renaming the item.")
                 }
                 ToolbarItem(placement: .primaryAction) {
                     Button("rename.rename") {
@@ -51,6 +53,7 @@ struct RenameView: View {
                     }
                     .keyboardShortcut(.defaultAction)
                     .disabled(!isNameValid)
+                    .help("Apply the new name.")
                 }
             }
             .onSubmit {

@@ -28,11 +28,13 @@ struct ProgramMenuView: View {
             program.run()
         }
         .labelStyle(.titleAndIcon)
+        .help("Launch this program now.")
         Section("program.settings") {
             Button("program.config", systemImage: "gearshape") {
                 path.append(program)
             }
             .labelStyle(.titleAndIcon)
+            .help("Open this program's runner, locale, and shortcut settings.")
 
             let buttonName = program.pinned
             ? String(localized: "button.unpin")
@@ -43,6 +45,9 @@ struct ProgramMenuView: View {
             }
             .labelStyle(.titleAndIcon)
             .symbolVariant(program.pinned ? .slash : .none)
+            .help(program.pinned
+                  ? "Remove this program from Quick Launch."
+                  : "Pin this program to Quick Launch.")
         }
     }
 }

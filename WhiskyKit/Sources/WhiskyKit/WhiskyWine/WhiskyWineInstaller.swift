@@ -20,6 +20,13 @@ import Foundation
 import SemanticVersion
 
 public class WhiskyWineInstaller {
+    private static func requiredURL(_ value: String) -> URL {
+        guard let url = URL(string: value) else {
+            preconditionFailure("Invalid static URL constant: \(value)")
+        }
+        return url
+    }
+
     /// Application Support root scoped by the active bundle identifier.
     public static let applicationFolder = FileManager.default.urls(
         for: .applicationSupportDirectory, in: .userDomainMask
@@ -31,17 +38,17 @@ public class WhiskyWineInstaller {
     /// URL to the installed `wine` `bin` directory.
     public static let binFolder: URL = libraryFolder.appending(path: "Wine").appending(path: "bin")
 
-    private static let latestGPTKReleaseURL = URL(
-        string: "https://api.github.com/repos/Gcenx/game-porting-toolkit/releases/latest"
-    )!
-    private static let latestGPTKReleasePageURL = URL(
-        string: "https://github.com/Gcenx/game-porting-toolkit/releases/latest"
-    )!
-    private static let latestGPTKReleaseDownloadBaseURL = URL(
-        string: "https://github.com/Gcenx/game-porting-toolkit/releases/download/"
-    )!
-    private static let legacyVersionPlistURL = URL(string: "https://data.getwhisky.app/Wine/WhiskyWineVersion.plist")!
-    private static let legacyRuntimeArchiveURL = URL(string: "https://data.getwhisky.app/Wine/Libraries.tar.gz")!
+    private static let latestGPTKReleaseURL = requiredURL(
+        "https://api.github.com/repos/Gcenx/game-porting-toolkit/releases/latest"
+    )
+    private static let latestGPTKReleasePageURL = requiredURL(
+        "https://github.com/Gcenx/game-porting-toolkit/releases/latest"
+    )
+    private static let latestGPTKReleaseDownloadBaseURL = requiredURL(
+        "https://github.com/Gcenx/game-porting-toolkit/releases/download/"
+    )
+    private static let legacyVersionPlistURL = requiredURL("https://data.getwhisky.app/Wine/WhiskyWineVersion.plist")
+    private static let legacyRuntimeArchiveURL = requiredURL("https://data.getwhisky.app/Wine/Libraries.tar.gz")
     private static let session = URLSession(configuration: .ephemeral)
     private static let localVersionPlistURL = libraryFolder
         .appending(path: "WhiskyWineVersion")
