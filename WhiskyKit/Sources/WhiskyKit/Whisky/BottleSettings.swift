@@ -457,13 +457,6 @@ public struct BottleSettings: Codable, Equatable {
             return settings
         }
 
-        if settings.wineConfig.wineVersion != BottleWineConfig().wineVersion {
-            Logger.wineKit.warning("Bottle has a different wine version `\(settings.wineConfig.wineVersion)`")
-            settings.wineConfig.wineVersion = BottleWineConfig().wineVersion
-            try settings.encode(to: metadataURL)
-            return settings
-        }
-
         return settings
     }
 

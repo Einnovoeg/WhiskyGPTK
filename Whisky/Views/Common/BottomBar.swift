@@ -27,48 +27,19 @@ extension View {
 }
 
 private struct BottomBarViewModifier<BarContent>: ViewModifier where BarContent: View {
-    @AppStorage("useGlassUI") private var useGlassUI = true
+    @AppStorage("useGlassUI") private var useGlassUI = false
     var barContent: BarContent
 
     func body(content: Content) -> some View {
         content
             .safeAreaInset(edge: .bottom, spacing: 0) {
-                Group {
-                    if useGlassUI {
-                        barContent
-                            .padding(.vertical, 12)
-                            .padding(.horizontal, 20)
-                            .background {
-                                RoundedRectangle(cornerRadius: 24, style: .continuous)
-                                    .fill(.ultraThinMaterial)
-                                    .overlay {
-                                        LinearGradient(
-                                            colors: [
-                                                WhiskyBrandPalette.gold.opacity(0.10),
-                                                Color.clear,
-                                                WhiskyBrandPalette.copper.opacity(0.12)
-                                            ],
-                                            startPoint: .topLeading,
-                                            endPoint: .bottomTrailing
-                                        )
-                                        .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
-                                    }
-                            }
-                            .overlay {
-                                RoundedRectangle(cornerRadius: 24, style: .continuous)
-                                    .strokeBorder(Color.white.opacity(0.18), lineWidth: 1)
-                            }
-                            .shadow(color: .black.opacity(0.16), radius: 24, x: 0, y: 12)
-                            .padding(.horizontal, 16)
-                            .padding(.bottom, 12)
-                    } else {
-                        VStack(spacing: 0) {
-                            Divider()
-                            barContent
-                        }
-                        .background(.regularMaterial)
-                    }
+                VStack(spacing: 0) {
+                    Divider()
+                    barContent
+                        .padding(.vertical, 10)
+                        .padding(.horizontal, 16)
                 }
+                .background(useGlassUI ? .thinMaterial : .regularMaterial)
                 .buttonStyle(BottomBarButtonStyle())
             }
     }

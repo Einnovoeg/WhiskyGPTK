@@ -19,16 +19,57 @@
 import SwiftUI
 import WhiskyKit
 
+private enum SettingsTab: String, CaseIterable, Identifiable {
+    case general
+    case appearance
+    case runners
+    case updates
+    case resources
+
+    var id: Self { self }
+
+    var title: String {
+        switch self {
+        case .general:
+            return "General"
+        case .appearance:
+            return "Appearance"
+        case .runners:
+            return "Runners"
+        case .updates:
+            return "Updates"
+        case .resources:
+            return "Resources"
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .general:
+            return "gearshape"
+        case .appearance:
+            return "paintbrush"
+        case .runners:
+            return "shippingbox"
+        case .updates:
+            return "arrow.triangle.2.circlepath"
+        case .resources:
+            return "doc.text"
+        }
+    }
+}
+
 struct SettingsView: View {
     @AppStorage("SUEnableAutomaticChecks") var whiskyUpdate = true
     @AppStorage("killOnTerminate") var killOnTerminate = true
     @AppStorage("checkWhiskyWineUpdates") var checkWhiskyWineUpdates = true
     @AppStorage("autoInstallWhiskyWineUpdates") var autoInstallWhiskyWineUpdates = true
     @AppStorage("preferLocalGPTKRuntime") var preferLocalGPTKRuntime = true
-    @AppStorage("useGlassUI") var useGlassUI = true
+    @AppStorage("useGlassUI") var useGlassUI = false
     @AppStorage("disableAppNap") var disableAppNap = true
     @AppStorage("wrapProgramShortcuts") var wrapProgramShortcuts = true
     @AppStorage("defaultBottleLocation") var defaultBottleLocation = BottleData.defaultBottleDir
+    @AppStorage("selectedWineRuntimeSelection") var selectedWineRuntimeSelection = WhiskyWineInstaller.RuntimeSelection.gptkManaged.rawValue
     @State private var latestRuntimePackage: WhiskyWineInstaller.RuntimePackage?
     @State private var latestRuntimeSummary = String(
         localized: "settings.runtime.checking",
@@ -36,8 +77,16 @@ struct SettingsView: View {
     )
     @State private var dosboxVersionSummary = "Detecting DOSBox..."
     @State private var runtimeActionMessage: String?
+    @State private var runnerActionMessage: String?
     @State private var isRefreshingRuntime = false
     @State private var isInstallingRuntime = false
+    @State private var isRefreshingRunners = false
+    @State private var isManagingWineRuntime = false
+    @State private var isManagingDOSBox = false
+    @State private var selectedTab: SettingsTab = .general
+    @State private var systemScanReport: SystemScanReport?
+    @State private var selectedWineStatus: HomebrewCaskStatus?
+    @State private var dosboxCaskStatus: HomebrewCaskStatus?
     private let hasAppUpdateFeed: Bool = {
         guard let feedURL = Bundle.main.object(forInfoDictionaryKey: "SUFeedURL") as? String else {
             return false
@@ -49,7 +98,7 @@ struct SettingsView: View {
         let buildNumber = Bundle.main.object(forInfoDictionaryKey: kCFBundleVersionKey as String) as? String ?? "0"
         return "\(marketingVersion) (\(buildNumber))"
     }
-    private var runtimeSummary: String {
+    private var managedRuntimeSummary: String {
         let version = WhiskyWineInstaller.whiskyWineVersion().map(String.init) ?? String(
             localized: "settings.runtime.notInstalled",
             defaultValue: "Not installed"
@@ -60,11 +109,71 @@ struct SettingsView: View {
         )
         return "\(version) · \(source)"
     }
+    private var activeWineSummary: String {
+        WhiskyWineInstaller.activeWineRuntimeSummary()
+    }
+    private var runtimeSelection: WhiskyWineInstaller.RuntimeSelection {
+        WhiskyWineInstaller.RuntimeSelection(rawValue: selectedWineRuntimeSelection) ?? .gptkManaged
+    }
+    private var selectedWineCask: HomebrewCask? {
+        switch runtimeSelection {
+        case .gptkManaged:
+            return nil
+        case .wineStable:
+            return .wineStable
+        case .wineDevel:
+            return .wineDevel
+        case .wineStaging:
+            return .wineStaging
+        }
+    }
+    private var selectedWineStatusSummary: String {
+        selectedWineStatus?.summary ?? "Select a Homebrew Wine runtime to see install status."
+    }
     private var dosboxPathSummary: String {
         DOSBox.executableURL()?.prettyPath() ?? "Not installed"
     }
 
     var body: some View {
+        TabView(selection: $selectedTab) {
+            generalTab
+                .tabItem {
+                    Label(SettingsTab.general.title, systemImage: SettingsTab.general.systemImage)
+                }
+                .tag(SettingsTab.general)
+
+            appearanceTab
+                .tabItem {
+                    Label(SettingsTab.appearance.title, systemImage: SettingsTab.appearance.systemImage)
+                }
+                .tag(SettingsTab.appearance)
+
+            runnersTab
+                .tabItem {
+                    Label(SettingsTab.runners.title, systemImage: SettingsTab.runners.systemImage)
+                }
+                .tag(SettingsTab.runners)
+
+            updatesTab
+                .tabItem {
+                    Label(SettingsTab.updates.title, systemImage: SettingsTab.updates.systemImage)
+                }
+                .tag(SettingsTab.updates)
+
+            resourcesTab
+                .tabItem {
+                    Label(SettingsTab.resources.title, systemImage: SettingsTab.resources.systemImage)
+                }
+                .tag(SettingsTab.resources)
+        }
+        .frame(width: 660, height: 520)
+        .task {
+            await refreshLatestRuntime()
+            await refreshRunnerStatus()
+        }
+    }
+
+    private var generalTab: some View {
         Form {
             Section {
                 HStack(alignment: .center, spacing: 14) {
@@ -76,7 +185,7 @@ struct SettingsView: View {
                         Text("Version \(appVersionSummary)")
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
-                        Text("Runtime \(runtimeSummary)")
+                        Text("Runtime \(activeWineSummary)")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
@@ -93,7 +202,8 @@ struct SettingsView: View {
                 }
                 .padding(.vertical, 4)
             }
-            Section("settings.general") {
+
+            Section("General") {
                 Toggle(
                     String(
                         localized: "settings.toggle.kill.on.terminate",
@@ -101,6 +211,7 @@ struct SettingsView: View {
                     ),
                     isOn: $killOnTerminate
                 )
+
                 Toggle(
                     String(
                         localized: "settings.toggle.appNap",
@@ -111,6 +222,7 @@ struct SettingsView: View {
                 .onChange(of: disableAppNap) { _, isDisabled in
                     WhiskyActivityController.shared.setAppNapDisabled(isDisabled)
                 }
+
                 ActionView(
                     text: "settings.path",
                     subtitle: defaultBottleLocation.prettyPath(),
@@ -130,12 +242,19 @@ struct SettingsView: View {
                 }
                 .help("Choose where newly created bottles and DOS libraries are stored by default.")
             }
-            Section {
+        }
+        .formStyle(.grouped)
+    }
+
+    private var appearanceTab: some View {
+        Form {
+            Section("Window Style") {
                 Toggle(
                     String(localized: "settings.toggle.glass", defaultValue: "Use glass effects"),
                     isOn: $useGlassUI
                 )
                 .help("Enable the newer glass treatment across the app.")
+
                 Toggle(
                     String(
                         localized: "settings.toggle.wrapShortcuts",
@@ -144,16 +263,132 @@ struct SettingsView: View {
                     isOn: $wrapProgramShortcuts
                 )
                 .help("Apply Whisky GPTK styling when generating macOS shortcuts.")
-            } header: {
-                Text(String(localized: "settings.appearance", defaultValue: "Appearance"))
             }
-            Section("Runners") {
-                Text("GPTK Wine: \(runtimeSummary)")
+
+            Section("Notes") {
+                Text("Keep glass effects off if you want the quietest, most traditional window appearance.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                Text("DOSBox: \(dosboxVersionSummary)")
+            }
+        }
+        .formStyle(.grouped)
+    }
+
+    private var runnersTab: some View {
+        Form {
+            Section("System Scan") {
+                VStack(alignment: .leading, spacing: 12) {
+                    Text(systemScanReport?.summary ?? "Scanning this Mac...")
+                        .font(.subheadline)
+
+                    Text("Active Wine: \(systemScanReport?.activeWineSummary ?? activeWineSummary)")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Text("DOSBox: \(systemScanReport?.dosboxSummary ?? dosboxVersionSummary)")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+
+                    if let findings = systemScanReport?.findings, !findings.isEmpty {
+                        ForEach(findings) { finding in
+                            Label {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(finding.title)
+                                        .font(.caption.weight(.semibold))
+                                    Text(finding.detail)
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
+                            } icon: {
+                                Image(systemName: finding.severity == .ready ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
+                                    .foregroundStyle(finding.severity == .ready ? .green : .orange)
+                            }
+                        }
+                    }
+
+                    HStack {
+                        Button(isRefreshingRunners ? "Scanning…" : "Scan This Mac") {
+                            Task {
+                                await refreshRunnerStatus()
+                            }
+                        }
+                        .disabled(isRefreshingRunners || isManagingWineRuntime || isManagingDOSBox)
+                        .help("Scan this Mac and summarize which runner components still need attention.")
+
+                        Button("Apply Recommended Defaults") {
+                            applyRecommendedDefaults()
+                            Task {
+                                await refreshRunnerStatus()
+                            }
+                        }
+                        .disabled(isRefreshingRunners || isManagingWineRuntime || isManagingDOSBox)
+                        .help("Enable the recommended stability and runtime-update defaults for this app.")
+                    }
+                }
+            }
+
+            Section("Wine Runtime") {
+                Picker("Active runtime", selection: Binding(
+                    get: { runtimeSelection },
+                    set: { newValue in
+                        selectedWineRuntimeSelection = newValue.rawValue
+                        WhiskyWineInstaller.setSelectedRuntimeSelection(newValue)
+                        Task {
+                            await refreshRunnerStatus()
+                        }
+                    }
+                )) {
+                    ForEach(WhiskyWineInstaller.RuntimeSelection.allCases, id: \.self) { selection in
+                        Text(selection.displayName).tag(selection)
+                    }
+                }
+                .help("Choose which Wine runtime family should own Windows libraries on this Mac.")
+
+                Text(runtimeSelection.summary)
                     .font(.caption)
                     .foregroundStyle(.secondary)
+
+                if runtimeSelection == .gptkManaged {
+                    Text("Managed GPTK runtime: \(managedRuntimeSummary)")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+
+                    Text("GPTK installs and updates stay on the Updates tab so runner selection stays focused.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                } else {
+                    Text(selectedWineStatusSummary)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+
+                    Button(isManagingWineRuntime ? "Working…" : "Install or Update Selected Runtime") {
+                        Task {
+                            await installOrUpdateSelectedWineRuntime()
+                        }
+                    }
+                    .disabled(isRefreshingRunners || isManagingWineRuntime || selectedWineCask == nil)
+                    .help("Install or update the selected Homebrew Wine runtime.")
+                }
+
+                if let runnerActionMessage {
+                    Text(runnerActionMessage)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            Section("DOSBox") {
+                Text(dosboxCaskStatus?.summary ?? dosboxVersionSummary)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                Button(isManagingDOSBox ? "Working…" : "Install or Update DOSBox") {
+                    Task {
+                        await installOrUpdateDOSBox()
+                    }
+                }
+                .disabled(isRefreshingRunners || isManagingDOSBox)
+                .help("Install or update DOSBox Staging using Homebrew.")
+
                 ActionView(
                     text: "DOSBox executable",
                     subtitle: dosboxPathSummary,
@@ -168,24 +403,38 @@ struct SettingsView: View {
                         if result == .OK, let url = panel.urls.first {
                             DOSBox.setOverrideExecutableURL(url)
                             Task {
-                                await refreshDOSBoxSummary()
+                                await refreshRunnerStatus()
                             }
                         }
                     }
                 }
                 .help("Point Whisky GPTK at a specific DOSBox or DOSBox Staging binary.")
+
                 Button("Use Auto-Detected DOSBox") {
                     DOSBox.setOverrideExecutableURL(nil)
                     Task {
-                        await refreshDOSBoxSummary()
+                        await refreshRunnerStatus()
                     }
                 }
                 .help("Clear the manual DOSBox path and fall back to standard macOS install locations.")
-                Text("Wine 11.0 improves WoW64 and synchronization upstream. On macOS, the Linux-only NTSYNC work does not apply, so this build keeps MSync for Wine bottles and uses DOSBox Staging for DOS-era titles.")
+            }
+
+            Section("Runner Notes") {
+                Text(
+                    "Wine 11 stable is now available as a selectable macOS runtime. "
+                    + "DOSBox Staging can be installed and updated from here. "
+                    + "Lutris itself is Linux-first, so this app follows the same launcher idea with native macOS runners instead of exposing a fake Lutris runtime."
+                )
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
-            Section("settings.updates") {
+        }
+        .formStyle(.grouped)
+    }
+
+    private var updatesTab: some View {
+        Form {
+            Section("Application") {
                 if hasAppUpdateFeed {
                     Toggle(
                         String(
@@ -201,6 +450,9 @@ struct SettingsView: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
+            }
+
+            Section("Runtime") {
                 Toggle(
                     String(
                         localized: "settings.toggle.whiskywine.updates",
@@ -209,6 +461,7 @@ struct SettingsView: View {
                     isOn: $checkWhiskyWineUpdates
                 )
                 .help("Check for newer GPTK Wine runtime packages.")
+
                 Toggle(
                     String(localized: "settings.toggle.whiskywine.autoInstall",
                            defaultValue: "Automatically install runtime updates"),
@@ -216,23 +469,26 @@ struct SettingsView: View {
                 )
                 .disabled(!checkWhiskyWineUpdates)
                 .help("Install newer GPTK runtime packages without prompting.")
+
                 Toggle(
                     String(localized: "settings.toggle.runtime.preferLocal",
                            defaultValue: "Prefer local mounted GPTK runtime"),
                     isOn: $preferLocalGPTKRuntime
                 )
                 .help("Prefer locally mounted Apple GPTK images when they are newer than the remote runtime.")
+
                 Text(
                     String(
                         format: String(
                             localized: "settings.runtime.installed",
                             defaultValue: "Installed Runtime: %@"
                         ),
-                        runtimeSummary
+                        managedRuntimeSummary
                     )
                 )
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
                 Text(
                     String(
                         format: String(
@@ -242,13 +498,15 @@ struct SettingsView: View {
                         latestRuntimeSummary
                     )
                 )
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
                 if let runtimeActionMessage {
                     Text(runtimeActionMessage)
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
+
                 HStack {
                     Button(
                         String(
@@ -274,7 +532,13 @@ struct SettingsView: View {
                     .help("Download and install the latest GPTK runtime package.")
                 }
             }
-            Section {
+        }
+        .formStyle(.grouped)
+    }
+
+    private var resourcesTab: some View {
+        Form {
+            Section("Documentation") {
                 if let readmeURL = ProjectInfo.bundledDocumentURL(.readme) {
                     Link(
                         String(localized: "settings.resources.readme", defaultValue: "Installation Guide"),
@@ -293,6 +557,9 @@ struct SettingsView: View {
                         destination: dependenciesURL
                     )
                 }
+            }
+
+            Section("Project") {
                 Link(
                     String(localized: "settings.resources.repository", defaultValue: "Project Repository"),
                     destination: ProjectInfo.repositoryURL
@@ -306,13 +573,16 @@ struct SettingsView: View {
                     destination: ProjectInfo.issuesURL
                 )
                 Link(
-                        String(localized: "settings.resources.upstream", defaultValue: "Archived Upstream Repository"),
-                        destination: ProjectInfo.archivedRepositoryURL
+                    String(localized: "settings.resources.upstream", defaultValue: "Archived Upstream Repository"),
+                    destination: ProjectInfo.archivedRepositoryURL
                 )
                 Link(
                     String(localized: "settings.resources.runtime", defaultValue: "GPTK Runtime Releases"),
                     destination: ProjectInfo.runtimeReleasesURL
                 )
+            }
+
+            Section("Compliance") {
                 Link(
                     String(localized: "settings.resources.notices", defaultValue: "Third-Party Notices"),
                     destination: ProjectInfo.documentURL(.thirdPartyNotices)
@@ -321,12 +591,15 @@ struct SettingsView: View {
                     String(localized: "settings.resources.license", defaultValue: "Project License"),
                     destination: ProjectInfo.documentURL(.license)
                 )
+            }
+
+            Section {
                 Link(
                     String(localized: "settings.resources.support", defaultValue: "Buy Me a Coffee"),
                     destination: ProjectInfo.fundingURL
                 )
             } header: {
-                Text(String(localized: "settings.resources", defaultValue: "Resources"))
+                Text("Support")
             } footer: {
                 Text(
                     String(
@@ -338,12 +611,6 @@ struct SettingsView: View {
             }
         }
         .formStyle(.grouped)
-        .fixedSize(horizontal: false, vertical: true)
-        .frame(width: ViewWidth.medium)
-        .task {
-            await refreshLatestRuntime()
-            await refreshDOSBoxSummary()
-        }
     }
 
     @MainActor
@@ -421,6 +688,73 @@ struct SettingsView: View {
                 defaultValue: "Runtime installation failed."
             )
         await refreshLatestRuntime()
+    }
+
+    @MainActor
+    private func refreshRunnerStatus() async {
+        isRefreshingRunners = true
+        defer { isRefreshingRunners = false }
+
+        WhiskyWineInstaller.setSelectedRuntimeSelection(runtimeSelection)
+        systemScanReport = await WhiskySystemScan.scan()
+        if let selectedWineCask {
+            selectedWineStatus = await HomebrewRuntimeManager.status(for: selectedWineCask)
+        } else {
+            selectedWineStatus = nil
+        }
+        dosboxCaskStatus = await HomebrewRuntimeManager.status(for: .dosboxStaging)
+        await refreshDOSBoxSummary()
+    }
+
+    @MainActor
+    private func installOrUpdateSelectedWineRuntime() async {
+        guard let selectedWineCask else {
+            runnerActionMessage = "Switch to a Homebrew Wine runtime to install Wine 11 from this tab."
+            return
+        }
+
+        isManagingWineRuntime = true
+        defer { isManagingWineRuntime = false }
+
+        let result = await HomebrewRuntimeManager.installOrUpgrade(selectedWineCask)
+        let failureSummary = result.output
+            .split(whereSeparator: \.isNewline)
+            .last
+            .map(String.init) ?? "Unknown Homebrew error."
+        runnerActionMessage = result.success
+            ? "\(selectedWineCask.displayName) is ready."
+            : "Failed to install \(selectedWineCask.displayName): \(failureSummary)"
+        await refreshRunnerStatus()
+    }
+
+    @MainActor
+    private func installOrUpdateDOSBox() async {
+        isManagingDOSBox = true
+        defer { isManagingDOSBox = false }
+
+        let result = await HomebrewRuntimeManager.installOrUpgrade(.dosboxStaging)
+        let failureSummary = result.output
+            .split(whereSeparator: \.isNewline)
+            .last
+            .map(String.init) ?? "Unknown Homebrew error."
+        runnerActionMessage = result.success
+            ? "DOSBox Staging is ready."
+            : "Failed to install DOSBox Staging: \(failureSummary)"
+        await refreshRunnerStatus()
+    }
+
+    private func applyRecommendedDefaults() {
+        disableAppNap = true
+        WhiskyActivityController.shared.setAppNapDisabled(true)
+        checkWhiskyWineUpdates = true
+        autoInstallWhiskyWineUpdates = true
+        preferLocalGPTKRuntime = true
+
+        if runtimeSelection != .gptkManaged,
+           WhiskyWineInstaller.currentWineRuntime() == nil {
+            selectedWineRuntimeSelection = WhiskyWineInstaller.RuntimeSelection.gptkManaged.rawValue
+            WhiskyWineInstaller.setSelectedRuntimeSelection(.gptkManaged)
+        }
     }
 
     @MainActor

@@ -21,140 +21,137 @@ import WhiskyKit
 import UniformTypeIdentifiers
 
 struct BottleListEntry: View {
-    @AppStorage("useGlassUI") private var useGlassUI = true
+    @AppStorage("useGlassUI") private var useGlassUI = false
     let bottle: Bottle
     @Binding var selected: URL?
-    @Binding var refresh: Bool
 
-    @State private var showBottleRename: Bool = false
-    @State private var name: String = ""
+    @State private var showBottleRename = false
 
     var body: some View {
         HStack(spacing: 12) {
             ZStack {
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .fill((isSelected && useGlassUI) ? Color.white.opacity(0.16) : Color.white.opacity(useGlassUI ? 0.08 : 0.0))
-                    .frame(width: 36, height: 36)
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .fill(iconBackground)
+                    .frame(width: 30, height: 30)
                 Image(systemName: bottle.isAvailable ? bottle.runner.systemImage : "externaldrive.badge.xmark")
-                    .foregroundStyle(bottle.isAvailable ? runnerTint : Color.secondary)
+                    .foregroundStyle(bottle.isAvailable ? runnerTint : .secondary)
             }
             .help(bottle.isAvailable
                   ? "Runner: \(bottle.runner.displayName)"
                   : "This library is unavailable because its runtime is missing.")
 
-            VStack(alignment: .leading, spacing: 4) {
-                Text(name)
-                    .fontWeight(.semibold)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(bottle.settings.name)
+                    .font(.body.weight(.semibold))
                     .lineLimit(1)
-                HStack(spacing: 8) {
-                    Text(bottle.runner.shortDisplayName)
-                    if bottle.runner == .wine {
-                        Text(bottle.settings.windowsVersion.pretty())
-                        Text(bottle.settings.dxvk ? "DXVK" : "D3DMetal")
-                        if bottle.settings.avxEnabled {
-                            Text("AVX")
-                        }
-                    } else {
-                        Text(bottle.settings.dosboxCycles.displayName)
-                        if bottle.settings.dosboxStartupProgram != nil {
-                            Text("Auto Launch")
-                        }
-                    }
-                }
-                .font(.caption)
-                .foregroundStyle(.secondary)
+                Text(subtitle)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
             }
 
-            Spacer()
+            Spacer(minLength: 8)
 
-            if isSelected && useGlassUI {
-                Image(systemName: "arrow.right.circle.fill")
+            if !bottle.isAvailable {
+                Image(systemName: "exclamationmark.triangle.fill")
                     .foregroundStyle(.secondary)
             }
         }
         .padding(.horizontal, 10)
-        .padding(.vertical, 8)
+        .padding(.vertical, 6)
         .background {
-            if useGlassUI {
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .fill(isSelected ? Color.white.opacity(0.16) : Color.white.opacity(0.05))
+            if useGlassUI && isSelected {
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(Color.white.opacity(0.12))
                     .overlay {
-                        RoundedRectangle(cornerRadius: 18, style: .continuous)
-                            .strokeBorder(Color.white.opacity(isSelected ? 0.18 : 0.08), lineWidth: 1)
+                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            .strokeBorder(Color.white.opacity(0.14), lineWidth: 1)
                     }
             }
         }
-            .opacity(bottle.isAvailable ? 1.0 : 0.5)
-            .onChange(of: refresh, initial: true) {
-                name = bottle.settings.name
+        .opacity(bottle.isAvailable ? 1.0 : 0.6)
+        .sheet(isPresented: $showBottleRename) {
+            RenameView("rename.bottle.title", name: bottle.settings.name) { newName in
+                bottle.rename(newName: newName)
             }
-            .sheet(isPresented: $showBottleRename) {
-                RenameView("rename.bottle.title", name: name) { newName in
-                    name = newName
-                    bottle.rename(newName: newName)
-                }
+        }
+        .contextMenu {
+            Button("button.rename", systemImage: "pencil.line") {
+                showBottleRename.toggle()
             }
-            .contextMenu {
-                Button("button.rename", systemImage: "pencil.line") {
-                    showBottleRename.toggle()
-                }
-                .disabled(!bottle.isAvailable)
-                .labelStyle(.titleAndIcon)
-                Button("button.removeAlert", systemImage: "trash") {
-                    showRemoveAlert(bottle: bottle)
-                }
-                .labelStyle(.titleAndIcon)
-                Divider()
-                Button("button.moveBottle", systemImage: "shippingbox.and.arrow.backward") {
-                    let panel = NSOpenPanel()
-                    panel.canChooseFiles = false
-                    panel.canChooseDirectories = true
-                    panel.allowsMultipleSelection = false
-                    panel.canCreateDirectories = true
-                    panel.begin { result in
-                        if result == .OK {
-                            if let url = panel.urls.first {
-                                let newBottePath = url
-                                    .appending(path: bottle.url.lastPathComponent)
+            .disabled(!bottle.isAvailable)
+            .labelStyle(.titleAndIcon)
 
-                                bottle.move(destination: newBottePath)
-                                selected = newBottePath
-                            }
-                        }
-                    }
-                }
-                .disabled(!bottle.isAvailable)
-                .labelStyle(.titleAndIcon)
-                Button("button.exportBottle", systemImage: "arrowshape.turn.up.right") {
-                    let panel = NSSavePanel()
-                    panel.canCreateDirectories = true
-                    panel.allowedContentTypes = [UTType.gzip]
-                    panel.allowsOtherFileTypes = false
-                    panel.isExtensionHidden = false
-                    panel.nameFieldStringValue = bottle.settings.name + ".tar"
-                    panel.begin { result in
-                        if result == .OK {
-                            if let url = panel.url {
-                                Task.detached(priority: .background) {
-                                    bottle.exportAsArchive(destination: url)
-                                }
-                            }
-                        }
-                    }
-                }
-                .disabled(!bottle.isAvailable)
-                .labelStyle(.titleAndIcon)
-                Divider()
-                Button("button.showInFinder", systemImage: "folder") {
-                    NSWorkspace.shared.activateFileViewerSelecting([bottle.url])
-                }
-                .disabled(!bottle.isAvailable)
-                .labelStyle(.titleAndIcon)
+            Button("button.removeAlert", systemImage: "trash") {
+                showRemoveAlert(bottle: bottle)
             }
+            .labelStyle(.titleAndIcon)
+
+            Divider()
+
+            Button("button.moveBottle", systemImage: "shippingbox.and.arrow.backward") {
+                let panel = NSOpenPanel()
+                panel.canChooseFiles = false
+                panel.canChooseDirectories = true
+                panel.allowsMultipleSelection = false
+                panel.canCreateDirectories = true
+                panel.begin { result in
+                    if result == .OK, let url = panel.urls.first {
+                        let newBottlePath = url.appending(path: bottle.url.lastPathComponent)
+                        bottle.move(destination: newBottlePath)
+                        selected = newBottlePath
+                    }
+                }
+            }
+            .disabled(!bottle.isAvailable)
+            .labelStyle(.titleAndIcon)
+
+            Button("button.exportBottle", systemImage: "arrowshape.turn.up.right") {
+                let panel = NSSavePanel()
+                panel.canCreateDirectories = true
+                panel.allowedContentTypes = [UTType.gzip]
+                panel.allowsOtherFileTypes = false
+                panel.isExtensionHidden = false
+                panel.nameFieldStringValue = bottle.settings.name + ".tar"
+                panel.begin { result in
+                    if result == .OK, let url = panel.url {
+                        Task.detached(priority: .background) {
+                            bottle.exportAsArchive(destination: url)
+                        }
+                    }
+                }
+            }
+            .disabled(!bottle.isAvailable)
+            .labelStyle(.titleAndIcon)
+
+            Divider()
+
+            Button("button.showInFinder", systemImage: "folder") {
+                NSWorkspace.shared.activateFileViewerSelecting([bottle.url])
+            }
+            .disabled(!bottle.isAvailable)
+            .labelStyle(.titleAndIcon)
+        }
     }
 
     private var isSelected: Bool {
         selected == bottle.url
+    }
+
+    private var subtitle: String {
+        if bottle.runner == .wine {
+            var parts = [bottle.settings.windowsVersion.pretty(), bottle.settings.dxvk ? "DXVK" : "D3DMetal"]
+            if bottle.settings.avxEnabled {
+                parts.append("AVX")
+            }
+            return parts.joined(separator: " • ")
+        }
+
+        var parts = [bottle.settings.dosboxCycles.displayName]
+        if bottle.settings.dosboxStartupProgram != nil {
+            parts.append("Startup Game")
+        }
+        return parts.joined(separator: " • ")
     }
 
     private var runnerTint: Color {
@@ -166,12 +163,21 @@ struct BottleListEntry: View {
         }
     }
 
-    func showRemoveAlert(bottle: Bottle) {
-        let checkbox = NSButton(checkboxWithTitle: String(localized: "button.removeAlert.checkbox"),
-                                target: self, action: nil)
+    private var iconBackground: Color {
+        useGlassUI ? Color.white.opacity(0.08) : Color.secondary.opacity(0.10)
+    }
+
+    private func showRemoveAlert(bottle: Bottle) {
+        let checkbox = NSButton(
+            checkboxWithTitle: String(localized: "button.removeAlert.checkbox"),
+            target: self,
+            action: nil
+        )
         let alert = NSAlert()
-        alert.messageText = String(format: String(localized: "button.removeAlert.msg"),
-                                   bottle.settings.name)
+        alert.messageText = String(
+            format: String(localized: "button.removeAlert.msg"),
+            bottle.settings.name
+        )
         alert.informativeText = String(localized: "button.removeAlert.info")
         alert.alertStyle = .warning
         let delete = alert.addButton(withTitle: String(localized: "button.removeAlert.delete"))
@@ -198,7 +204,6 @@ struct BottleListEntry: View {
 #Preview {
     BottleListEntry(
         bottle: Bottle(bottleUrl: URL(filePath: "")),
-        selected: .constant(nil),
-        refresh: .constant(false)
+        selected: .constant(nil)
     )
 }

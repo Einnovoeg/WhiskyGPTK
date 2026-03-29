@@ -20,93 +20,73 @@ import SwiftUI
 import UniformTypeIdentifiers
 import WhiskyKit
 
-enum BottleStage {
-    case config
+enum BottleStage: String, CaseIterable, Identifiable {
+    case overview
     case programs
+    case config
     case processes
+
+    var id: Self { self }
+
+    var title: LocalizedStringKey {
+        switch self {
+        case .overview:
+            "Overview"
+        case .programs:
+            "tab.programs"
+        case .config:
+            "tab.config"
+        case .processes:
+            "Processes"
+        }
+    }
 }
 
 struct BottleView: View {
-    @AppStorage("useGlassUI") private var useGlassUI = true
+    @AppStorage("useGlassUI") private var useGlassUI = false
     @ObservedObject var bottle: Bottle
     @State private var path = NavigationPath()
-    @State private var programLoading: Bool = false
-    @State private var showWinetricksSheet: Bool = false
+    @State private var selectedStage: BottleStage = .overview
+    @State private var programLoading = false
+    @State private var showWinetricksSheet = false
 
-    private let gridLayout = [GridItem(.adaptive(minimum: 100, maximum: .infinity))]
+    // Keep the quick-launch grid compact so one or two pins do not stretch into an
+    // oversized empty panel. The previous adaptive-to-infinity layout is what made
+    // the screen feel visually broken even when the underlying actions still worked.
+    private let pinGridLayout = [GridItem(.adaptive(minimum: 112, maximum: 132), spacing: 12, alignment: .leading)]
 
     var body: some View {
         NavigationStack(path: $path) {
-            ScrollView {
-                VStack(alignment: .leading, spacing: useGlassUI ? 20 : 0) {
-                    if useGlassUI {
-                        bottleHero
-                            .padding(.horizontal)
-                            .padding(.top, 20)
-                    }
+            VStack(alignment: .leading, spacing: 16) {
+                BottleHeaderView(
+                    bottle: bottle,
+                    useGlassUI: useGlassUI,
+                    programLoading: programLoading,
+                    showWinetricks: { showWinetricksSheet = true },
+                    runProgram: openRunPicker
+                )
 
-                    pinnedProgramsSection
-                        .padding(.horizontal, useGlassUI ? 16 : 0)
+                stagePicker
 
-                    navigationLinksSection
-                        .padding(.horizontal, useGlassUI ? 16 : 0)
-                }
+                stageContent
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             }
-            .scrollContentBackground(useGlassUI ? .hidden : .automatic)
-            .bottomBar {
-                HStack {
-                    Spacer()
-                    Button(openFolderButtonTitle) {
-                        bottle.openCDrive()
-                    }
-                    .help(openFolderButtonHelp)
-                    Button("button.terminal") {
-                        bottle.openTerminal()
-                    }
-                    .help(terminalHelp)
-                    Button("button.winetricks") {
-                        showWinetricksSheet.toggle()
-                    }
-                    .help("Install helper components for Wine bottles.")
-                    .disabled(bottle.runner != .wine || !WhiskyWineInstaller.hasWinetricksRuntime())
-                    Button(primaryLaunchTitle) {
-                        openRunPicker()
-                    }
-                    .help(primaryLaunchHelp)
-                    .disabled(programLoading)
-                    if programLoading {
-                        Spacer()
-                            .frame(width: 10)
-                        ProgressView()
-                            .controlSize(.small)
-                    }
-                }
-                .padding()
-            }
-            .onAppear {
-                updateStartMenu()
-            }
+            .padding(useGlassUI ? 18 : 0)
             .disabled(!bottle.isAvailable)
             .navigationTitle(bottle.settings.name)
             .sheet(isPresented: $showWinetricksSheet) {
                 WinetricksView(bottle: bottle)
             }
+            .onAppear {
+                updateStartMenu()
+                normalizeSelectedStage()
+            }
             .onChange(of: bottle.settings) { oldValue, newValue in
                 guard oldValue != newValue else { return }
-                // Trigger a reload
                 BottleVM.shared.bottles = BottleVM.shared.bottles
             }
-            .navigationDestination(for: BottleStage.self) { stage in
-                switch stage {
-                case .config:
-                    ConfigView(bottle: bottle)
-                case .programs:
-                    ProgramsView(
-                        bottle: bottle, path: $path
-                    )
-                case .processes:
-                    RunningProcessesView(bottle: bottle)
-                }
+            .onChange(of: bottle.runner) {
+                normalizeSelectedStage()
             }
             .navigationDestination(for: Program.self) { program in
                 ProgramView(program: program)
@@ -114,165 +94,58 @@ struct BottleView: View {
         }
     }
 
-    private var bottleHero: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            HStack(alignment: .top, spacing: 16) {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text(bottle.settings.name)
-                        .font(.system(size: 30, weight: .bold, design: .rounded))
-                    Text(bottle.url.lastPathComponent)
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                }
-
-                Spacer()
-
-                WhiskyBrandIcon(size: 64)
-            }
-
-            ViewThatFits {
-                HStack(spacing: 8) {
-                    WhiskyGlassBadge(icon: bottle.runner.systemImage, title: bottle.runner.displayName, tint: .orange)
-                    if bottle.runner == .wine {
-                        WhiskyGlassBadge(icon: "desktopcomputer", title: bottle.settings.windowsVersion.pretty(), tint: .blue)
-                        WhiskyGlassBadge(icon: bottle.settings.dxvk ? "bolt.fill" : "sparkles", title: renderLabel, tint: bottle.settings.dxvk ? .orange : .green)
-                        WhiskyGlassBadge(icon: "speedometer", title: syncLabel, tint: .pink)
-                    } else {
-                        WhiskyGlassBadge(icon: "gamecontroller.fill", title: "DOS Games", tint: .green)
-                        WhiskyGlassBadge(icon: "terminal.fill", title: bottle.settings.dosboxCycles.displayName, tint: .pink)
-                    }
-                }
-                VStack(alignment: .leading, spacing: 8) {
-                    WhiskyGlassBadge(icon: bottle.runner.systemImage, title: bottle.runner.displayName, tint: .orange)
-                    if bottle.runner == .wine {
-                        WhiskyGlassBadge(icon: "desktopcomputer", title: bottle.settings.windowsVersion.pretty(), tint: .blue)
-                        WhiskyGlassBadge(icon: bottle.settings.dxvk ? "bolt.fill" : "sparkles", title: renderLabel, tint: bottle.settings.dxvk ? .orange : .green)
-                        WhiskyGlassBadge(icon: "speedometer", title: syncLabel, tint: .pink)
-                    } else {
-                        WhiskyGlassBadge(icon: "gamecontroller.fill", title: "DOS Games", tint: .green)
-                        WhiskyGlassBadge(icon: "terminal.fill", title: bottle.settings.dosboxCycles.displayName, tint: .pink)
-                    }
-                }
-            }
-
-            HStack(spacing: 10) {
-                Button(openFolderButtonTitle) {
-                    bottle.openCDrive()
-                }
-                .buttonStyle(.borderedProminent)
-                .help(openFolderButtonHelp)
-
-                Button("button.terminal") {
-                    bottle.openTerminal()
-                }
-                .buttonStyle(.bordered)
-                .help(terminalHelp)
-
-                Button("button.winetricks") {
-                    showWinetricksSheet.toggle()
-                }
-                .buttonStyle(.bordered)
-                .help("Install helper components for Wine bottles.")
-                .disabled(bottle.runner != .wine || !WhiskyWineInstaller.hasWinetricksRuntime())
-
-                Button(primaryLaunchTitle) {
-                    openRunPicker()
-                }
-                .buttonStyle(.bordered)
-                .help(primaryLaunchHelp)
-            }
-        }
-        .whiskyGlassCard(cornerRadius: 30)
+    private var availableStages: [BottleStage] {
+        bottle.runner == .wine
+        ? [.overview, .programs, .config, .processes]
+        : [.overview, .programs, .config]
     }
 
-    private var pinnedProgramsSection: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            if useGlassUI {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Quick Launch")
-                        .font(.title3.weight(.semibold))
-                    Text("Pinned apps and shortcuts for this bottle.")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                }
-            }
-
-            LazyVGrid(columns: gridLayout, alignment: .center, spacing: 12) {
-                ForEach(bottle.pinnedPrograms, id: \.id) { pinnedProgram in
-                    PinView(
-                        bottle: bottle,
-                        program: pinnedProgram.program,
-                        pin: pinnedProgram.pin,
-                        path: $path
-                    )
-                }
-                PinAddView(bottle: bottle)
+    private var stagePicker: some View {
+        Picker("Section", selection: $selectedStage) {
+            ForEach(availableStages) { stage in
+                Text(stage.title).tag(stage)
             }
         }
-        .padding(useGlassUI ? 4 : 0)
-        .whiskyGlassCard(cornerRadius: useGlassUI ? 28 : 0)
+        .pickerStyle(.segmented)
+        .labelsHidden()
+        .padding(.horizontal, useGlassUI ? 4 : 0)
+        .help("Switch between the bottle overview, installed programs, configuration, and running processes.")
     }
 
-    private var navigationLinksSection: some View {
-        Form {
-            NavigationLink(value: BottleStage.programs) {
-                Label("tab.programs", systemImage: "list.bullet")
-            }
-            NavigationLink(value: BottleStage.config) {
-                Label("tab.config", systemImage: "gearshape")
-            }
-//            NavigationLink(value: BottleStage.processes) {
-//                Label("tab.processes", systemImage: "hockey.puck.circle")
-//            }
+    @ViewBuilder
+    private var stageContent: some View {
+        switch selectedStage {
+        case .overview:
+            overviewContent
+        case .programs:
+            ProgramsView(bottle: bottle, path: $path)
+        case .config:
+            ConfigView(bottle: bottle)
+        case .processes:
+            RunningProcessesView(bottle: bottle)
         }
-        .formStyle(.grouped)
-        .scrollDisabled(true)
+    }
+
+    private var overviewContent: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                PinnedProgramsSection(
+                    bottle: bottle,
+                    path: $path,
+                    pinGridLayout: pinGridLayout,
+                    useGlassUI: useGlassUI
+                )
+                OverviewMetricsSection(bottle: bottle)
+                BottleDetailsSection(bottle: bottle, useGlassUI: useGlassUI)
+            }
+            .padding(.bottom, 18)
+        }
         .scrollContentBackground(useGlassUI ? .hidden : .automatic)
-        .whiskyGlassCard(cornerRadius: useGlassUI ? 28 : 0)
     }
 
-    private var renderLabel: String {
-        bottle.settings.dxvk ? "DXVK Enabled" : "D3DMetal"
-    }
-
-    private var openFolderButtonTitle: LocalizedStringKey {
-        bottle.runner == .wine ? "button.cDrive" : "Open DOS Games"
-    }
-
-    private var openFolderButtonHelp: String {
-        bottle.runner == .wine
-        ? "Open the Wine C: drive in Finder."
-        : "Open the DOS Games folder mounted as drive C: in DOSBox."
-    }
-
-    private var terminalHelp: String {
-        bottle.runner == .wine
-        ? "Open a Terminal session with the bottle environment loaded."
-        : "Open Terminal in the DOS Games folder and show the DOSBox command."
-    }
-
-    private var primaryLaunchTitle: LocalizedStringKey {
-        if bottle.runner == .dosbox, bottle.settings.dosboxStartupProgram != nil {
-            return "Launch Default Game"
-        }
-        return "button.run"
-    }
-
-    private var primaryLaunchHelp: String {
-        bottle.runner == .wine
-        ? "Browse for a Windows installer or executable and run it in this bottle."
-        : "Launch DOSBox, optionally starting the default DOS game configured for this library."
-    }
-
-    private var syncLabel: String {
-        switch bottle.settings.enhancedSync {
-        case .none:
-            return "No Sync Boost"
-        case .esync:
-            return "ESync"
-        case .msync:
-            return "MSync"
+    private func normalizeSelectedStage() {
+        if !availableStages.contains(selectedStage) {
+            selectedStage = .overview
         }
     }
 
@@ -286,7 +159,8 @@ struct BottleView: View {
         let startMenuPrograms = bottle.getStartMenuPrograms()
         for startMenuProgram in startMenuPrograms {
             for program in bottle.programs where
-            // For some godforsaken reason "foo/bar" != "foo/Bar" so...
+            // Keep the comparison case-insensitive because Wine may vary casing for
+            // the same path between discovery passes.
             program.url.path().caseInsensitiveCompare(startMenuProgram.url.path()) == .orderedSame {
                 program.pinned = true
                 guard !bottle.settings.pins.contains(where: { $0.url == program.url }) else { return }
@@ -348,6 +222,358 @@ struct BottleView: View {
                     print("Failed to launch program: \(error)")
                 }
             }
+        }
+    }
+}
+
+private struct BottleHeaderView: View {
+    let bottle: Bottle
+    let useGlassUI: Bool
+    let programLoading: Bool
+    let showWinetricks: () -> Void
+    let runProgram: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .top, spacing: 12) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                        .fill(Color.secondary.opacity(0.08))
+                        .frame(width: 56, height: 56)
+                    Image(systemName: bottle.runner == .wine ? "wineglass.fill" : "opticaldiscdrive.fill")
+                        .font(.title3.weight(.semibold))
+                        .foregroundStyle(bottle.runner == .wine ? .orange : .green)
+                }
+
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(bottle.settings.name)
+                        .font(.system(size: 28, weight: .bold, design: .rounded))
+                    Text("Manage this \(bottle.runner.displayName.lowercased()) library and its installed software.")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                    Text(bottle.url.path(percentEncoded: false))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .textSelection(.enabled)
+                        .lineLimit(2)
+                }
+
+                Spacer()
+
+                VStack(alignment: .trailing, spacing: 10) {
+                    Label(bottle.runner.displayName, systemImage: bottle.runner.systemImage)
+                        .font(.subheadline.weight(.semibold))
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 8)
+                        .background(bottle.runner == .wine ? Color.orange.opacity(0.14) : Color.green.opacity(0.14), in: Capsule())
+
+                    HStack(spacing: 8) {
+                        Button {
+                            runProgram()
+                        } label: {
+                            HStack(spacing: 8) {
+                                Label(primaryLaunchTitle, systemImage: "play.fill")
+                                if programLoading {
+                                    ProgressView()
+                                        .controlSize(.small)
+                                }
+                            }
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .disabled(programLoading)
+                        .help(primaryLaunchHelp)
+
+                        Menu {
+                            Button(openFolderButtonTitle, systemImage: "folder") {
+                                bottle.openCDrive()
+                            }
+
+                            Button("button.terminal", systemImage: "terminal") {
+                                bottle.openTerminal()
+                            }
+
+                            if bottle.runner == .wine {
+                                Button("button.winetricks", systemImage: "wrench.and.screwdriver") {
+                                    showWinetricks()
+                                }
+                                .disabled(!WhiskyWineInstaller.hasWinetricksRuntime())
+                            } else {
+                                Button("Open Config File", systemImage: "doc.text") {
+                                    NSWorkspace.shared.open(bottle.dosboxConfigURL)
+                                }
+                            }
+
+                            Divider()
+
+                            Button("Show in Finder", systemImage: "folder.badge.gearshape") {
+                                NSWorkspace.shared.activateFileViewerSelecting([bottle.url])
+                            }
+                        } label: {
+                            Label("Library", systemImage: "ellipsis.circle")
+                        }
+                        .menuStyle(.borderlessButton)
+                        .fixedSize()
+                        .help("Open library actions and advanced utilities.")
+                    }
+                }
+            }
+
+            statusBadges
+        }
+        .whiskyPanelCard(cornerRadius: 20, padding: useGlassUI ? 18 : 16)
+    }
+
+    private var statusBadges: some View {
+        ViewThatFits {
+            HStack(spacing: 8) {
+                if bottle.runner == .wine {
+                    statusBadge(title: bottle.settings.windowsVersion.pretty(), icon: "desktopcomputer", tint: .blue)
+                    statusBadge(title: renderLabel, icon: bottle.settings.dxvk ? "bolt.fill" : "sparkles", tint: bottle.settings.dxvk ? .orange : .green)
+                    statusBadge(title: syncLabel, icon: "speedometer", tint: .pink)
+                } else {
+                    statusBadge(title: bottle.settings.dosboxCycles.displayName, icon: "terminal.fill", tint: .green)
+                    if bottle.settings.dosboxStartupProgram != nil {
+                        statusBadge(title: "Startup Game", icon: "play.circle", tint: .blue)
+                    }
+                }
+            }
+
+            VStack(alignment: .leading, spacing: 8) {
+                if bottle.runner == .wine {
+                    statusBadge(title: bottle.settings.windowsVersion.pretty(), icon: "desktopcomputer", tint: .blue)
+                    statusBadge(title: renderLabel, icon: bottle.settings.dxvk ? "bolt.fill" : "sparkles", tint: bottle.settings.dxvk ? .orange : .green)
+                    statusBadge(title: syncLabel, icon: "speedometer", tint: .pink)
+                } else {
+                    statusBadge(title: bottle.settings.dosboxCycles.displayName, icon: "terminal.fill", tint: .green)
+                    if bottle.settings.dosboxStartupProgram != nil {
+                        statusBadge(title: "Startup Game", icon: "play.circle", tint: .blue)
+                    }
+                }
+            }
+        }
+    }
+
+    private func statusBadge(title: String, icon: String, tint: Color) -> some View {
+        WhiskyGlassBadge(icon: icon, title: title, tint: tint)
+    }
+
+    private var renderLabel: String {
+        bottle.settings.dxvk ? "DXVK Enabled" : "D3DMetal"
+    }
+
+    private var openFolderButtonTitle: LocalizedStringKey {
+        bottle.runner == .wine ? "button.cDrive" : "Open DOS Games"
+    }
+
+    private var openFolderButtonHelp: String {
+        bottle.runner == .wine
+        ? "Open the Wine C: drive in Finder."
+        : "Open the DOS Games folder mounted as drive C: in DOSBox."
+    }
+
+    private var terminalHelp: String {
+        bottle.runner == .wine
+        ? "Open a Terminal session with the bottle environment loaded."
+        : "Open Terminal in the DOS Games folder and show the DOSBox command."
+    }
+
+    private var primaryLaunchTitle: LocalizedStringKey {
+        if bottle.runner == .dosbox, bottle.settings.dosboxStartupProgram != nil {
+            return "Launch Default Game"
+        }
+        return "button.run"
+    }
+
+    private var primaryLaunchHelp: String {
+        bottle.runner == .wine
+        ? "Browse for a Windows installer or executable and run it in this bottle."
+        : "Launch DOSBox, optionally starting the default DOS game configured for this library."
+    }
+
+    private var syncLabel: String {
+        switch bottle.settings.enhancedSync {
+        case .none:
+            return "No Sync Boost"
+        case .esync:
+            return "ESync"
+        case .msync:
+            return "MSync"
+        }
+    }
+}
+
+private struct OverviewMetricsSection: View {
+    let bottle: Bottle
+
+    private let metricGrid = [GridItem(.adaptive(minimum: 160, maximum: 220), spacing: 12, alignment: .leading)]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Overview")
+                    .font(.headline)
+                Text("Core compatibility and runtime settings for this library.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+
+            LazyVGrid(columns: metricGrid, alignment: .leading, spacing: 12) {
+                if bottle.runner == .wine {
+                    OverviewMetricCard(label: "Windows", value: bottle.settings.windowsVersion.pretty(), icon: "desktopcomputer", tint: .blue)
+                    OverviewMetricCard(label: "Graphics", value: bottle.settings.dxvk ? "DXVK" : "D3DMetal", icon: bottle.settings.dxvk ? "bolt.fill" : "sparkles", tint: bottle.settings.dxvk ? .orange : .green)
+                    OverviewMetricCard(label: "Sync", value: syncLabel, icon: "speedometer", tint: .pink)
+                } else {
+                    OverviewMetricCard(label: "Cycles", value: bottle.settings.dosboxCycles.displayName, icon: "terminal.fill", tint: .green)
+                    OverviewMetricCard(label: "Startup", value: bottle.settings.dosboxStartupProgram.map { ($0 as NSString).lastPathComponent } ?? "Not set", icon: "play.circle", tint: .blue)
+                    OverviewMetricCard(label: "Pinned", value: String(bottle.pinnedPrograms.count), icon: "pin.circle", tint: .orange)
+                }
+            }
+        }
+        .whiskyPanelCard(cornerRadius: 20)
+    }
+
+    private var syncLabel: String {
+        switch bottle.settings.enhancedSync {
+        case .none:
+            return "None"
+        case .esync:
+            return "ESync"
+        case .msync:
+            return "MSync"
+        }
+    }
+}
+
+private struct OverviewMetricCard: View {
+    let label: String
+    let value: String
+    let icon: String
+    let tint: Color
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Image(systemName: icon)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(tint)
+
+            Text(value)
+                .font(.headline)
+                .lineLimit(2)
+                .minimumScaleFactor(0.9)
+
+            Text(label)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity, minHeight: 92, alignment: .leading)
+        .padding(12)
+        .background(Color.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .help("\(label): \(value)")
+    }
+}
+
+private struct PinnedProgramsSection: View {
+    let bottle: Bottle
+    @Binding var path: NavigationPath
+    let pinGridLayout: [GridItem]
+    let useGlassUI: Bool
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Quick Launch")
+                    .font(.headline)
+                Text("Pin installed programs here for one-click launch.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+
+            if bottle.pinnedPrograms.isEmpty {
+                ContentUnavailableView(
+                    "No Pinned Programs",
+                    systemImage: "pin.slash",
+                    description: Text("Add a program to keep your most-used launchers in one place.")
+                )
+                .frame(maxWidth: .infinity)
+            }
+
+            LazyVGrid(columns: pinGridLayout, alignment: .leading, spacing: 12) {
+                ForEach(bottle.pinnedPrograms, id: \.id) { pinnedProgram in
+                    PinView(
+                        bottle: bottle,
+                        program: pinnedProgram.program,
+                        pin: pinnedProgram.pin,
+                        path: $path
+                    )
+                }
+
+                PinAddView(bottle: bottle)
+            }
+        }
+        .whiskyPanelCard(cornerRadius: 20, padding: useGlassUI ? 18 : 16)
+    }
+}
+
+private struct BottleDetailsSection: View {
+    let bottle: Bottle
+    let useGlassUI: Bool
+    @State private var showsDetails = false
+
+    var body: some View {
+        DisclosureGroup("Library Details", isExpanded: $showsDetails) {
+            Grid(alignment: .leading, horizontalSpacing: 18, verticalSpacing: 10) {
+                BottleDetailRow(label: "Runner", value: bottle.runner.displayName)
+                BottleDetailRow(label: "Path", value: bottle.url.path(percentEncoded: false), selectable: true)
+                BottleDetailRow(label: "Pinned Programs", value: String(bottle.pinnedPrograms.count))
+
+                if bottle.runner == .wine {
+                    BottleDetailRow(label: "Windows Version", value: bottle.settings.windowsVersion.pretty())
+                    BottleDetailRow(label: "Graphics", value: bottle.settings.dxvk ? "DXVK" : "D3DMetal")
+                    BottleDetailRow(label: "Sync", value: syncLabel)
+                } else {
+                    BottleDetailRow(label: "Cycles", value: bottle.settings.dosboxCycles.displayName)
+                    BottleDetailRow(label: "DOS Games Folder", value: bottle.dosGamesFolder.path(percentEncoded: false), selectable: true)
+                    BottleDetailRow(
+                        label: "Startup Game",
+                        value: bottle.settings.dosboxStartupProgram.map { ($0 as NSString).lastPathComponent } ?? "None"
+                    )
+                }
+            }
+            .padding(.top, 10)
+        }
+        .whiskyPanelCard(cornerRadius: 20, padding: useGlassUI ? 18 : 16)
+    }
+
+    private var syncLabel: String {
+        switch bottle.settings.enhancedSync {
+        case .none:
+            return "None"
+        case .esync:
+            return "ESync"
+        case .msync:
+            return "MSync"
+        }
+    }
+}
+
+private struct BottleDetailRow: View {
+    let label: String
+    let value: String
+    var selectable = false
+
+    var body: some View {
+        GridRow {
+            Text(label)
+                .foregroundStyle(.secondary)
+            Group {
+                if selectable {
+                    Text(value)
+                        .textSelection(.enabled)
+                } else {
+                    Text(value)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 }

@@ -34,13 +34,14 @@ struct PinAddView: View {
             }
             .buttonStyle(.plain)
             .frame(width: 45, height: 45)
+            .help("Choose an installed program to pin for quick launch.")
             Spacer()
             Text("pin.help")
                 .multilineTextAlignment(.center)
                 .lineLimit(2, reservesSpace: true)
         }
         .frame(width: 90, height: 90)
-        .padding(10)
+        .whiskyPanelCard(cornerRadius: 16, padding: 10)
         .sheet(isPresented: $showingSheet) {
             PinCreationView(bottle: bottle)
         }

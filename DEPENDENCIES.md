@@ -37,6 +37,9 @@
 
 ## Optional External Tools
 
+- Homebrew
+  - Optional, but required for one-click Wine 11 and DOSBox installs from inside the app
+  - Install from `https://brew.sh`
 - `cabextract`
   - Required for Winetricks verbs in public builds
   - Install with `brew install cabextract`
@@ -44,10 +47,17 @@
   - Optional runner for DOS-era games and installers
   - Install with `brew install dosbox-staging`
   - Redistribution status in this repo: not bundled
+- WineHQ macOS builds via Homebrew casks
+  - Optional native Wine alternatives to the managed GPTK runtime
+  - Stable: `brew install --cask wine-stable`
+  - Devel: `brew install --cask wine@devel`
+  - Staging: `brew install --cask wine@staging`
+  - Redistribution status in this repo: not bundled
 
 ## Notes
 
 - This repository does not vendor full Game Porting Toolkit archives.
 - This repository does not vendor DOSBox Staging binaries.
+- This repository does not vendor Homebrew Wine binaries.
 - Runtime payloads are installed at first run or setup time.
 - Third-party license information is documented in `THIRD_PARTY_NOTICES.md` and `LICENSES/`.

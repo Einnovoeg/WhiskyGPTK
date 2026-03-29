@@ -26,19 +26,17 @@ struct ContentView: View {
     @AppStorage("selectedBottleURL") private var selectedBottleURL: URL?
     @AppStorage("checkWhiskyWineUpdates") private var checkWhiskyWineUpdates = true
     @AppStorage("autoInstallWhiskyWineUpdates") private var autoInstallWhiskyWineUpdates = true
-    @AppStorage("useGlassUI") private var useGlassUI = true
+    @AppStorage("useGlassUI") private var useGlassUI = false
+    @AppStorage("uiAppearanceRevision") private var uiAppearanceRevision = 0
     @EnvironmentObject var bottleVM: BottleVM
     @Binding var showSetup: Bool
 
     @State private var selected: URL?
-    @State private var showBottleCreation: Bool = false
-    @State private var bottlesLoaded: Bool = false
-    @State private var showBottleSelection: Bool = false
+    @State private var showBottleCreation = false
+    @State private var bottlesLoaded = false
     @State private var newlyCreatedBottleURL: URL?
     @State private var openedFileURL: URL?
-    @State private var triggerRefresh: Bool = false
     @State private var refreshAnimation: Angle = .degrees(0)
-
     @State private var bottleFilter = ""
 
     private var appDisplayName: String { Bundle.appDisplayName }
@@ -48,9 +46,11 @@ struct ContentView: View {
     var body: some View {
         NavigationSplitView {
             sidebar
+                .navigationSplitViewColumnWidth(min: 250, ideal: 280, max: 340)
         } detail: {
             detail
         }
+        .navigationSplitViewStyle(.balanced)
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 Button {
@@ -66,7 +66,6 @@ struct ContentView: View {
                     if let bottle = bottleVM.bottles.first(where: { $0.url == selected }) {
                         bottle.updateInstalledPrograms()
                     }
-                    triggerRefresh.toggle()
                     withAnimation(.default) {
                         refreshAnimation = .degrees(360)
                     } completion: {
@@ -74,7 +73,7 @@ struct ContentView: View {
                     }
                 } label: {
                     Image(systemName: "arrow.triangle.2.circlepath")
-                        .help("Refresh the bottle list and installed programs for the selected library.")
+                        .help("Refresh bottles, installed programs, and runtime status.")
                         .rotationEffect(refreshAnimation)
                 }
             }
@@ -86,9 +85,11 @@ struct ContentView: View {
             SetupView(showSetup: $showSetup, firstTime: false)
         }
         .sheet(item: $openedFileURL) { url in
-            FileOpenView(fileURL: url,
-                         currentBottle: selected,
-                         bottles: bottleVM.bottles)
+            FileOpenView(
+                fileURL: url,
+                currentBottle: selected,
+                bottles: bottleVM.bottles
+            )
         }
         .onChange(of: selected) {
             selectedBottleURL = selected
@@ -98,6 +99,7 @@ struct ContentView: View {
             openedFileURL = url
         }
         .task {
+            applyAppearanceMigrationIfNeeded()
             bottleVM.loadBottles()
             bottlesLoaded = true
 
@@ -114,7 +116,7 @@ struct ContentView: View {
             }
             if checkWhiskyWineUpdates && WhiskyWineInstaller.isWhiskyWineInstalled() {
                 let task = Task.detached {
-                    return await WhiskyWineInstaller.shouldUpdateWhiskyWine()
+                    await WhiskyWineInstaller.shouldUpdateWhiskyWine()
                 }
                 let updateInfo = await task.value
                 if updateInfo.0 {
@@ -155,55 +157,45 @@ struct ContentView: View {
         .whiskyWindowBackground()
     }
 
-    var sidebar: some View {
+    private var sidebar: some View {
         ScrollViewReader { proxy in
-            VStack(spacing: useGlassUI ? 14 : 0) {
-                if useGlassUI {
-                    sidebarHero
-                        .padding(.horizontal, 14)
-                        .padding(.top, 14)
-                }
+            VStack(spacing: 0) {
+                SidebarHeaderView(
+                    appDisplayName: appDisplayName,
+                    wineBottleCount: wineBottleCount,
+                    dosboxBottleCount: dosboxBottleCount,
+                    runtimeLabel: runtimeBadgeLabel,
+                    runtimeSummary: "\(runtimeReleaseLabel) via \(runtimeSourceLabel)",
+                    dosboxStatus: dosboxStatusLabel
+                )
+                .padding(.horizontal, 16)
+                .padding(.top, 14)
+                .padding(.bottom, 8)
 
                 List(selection: $selected) {
-                    Section {
-                        ForEach(filteredBottles) { bottle in
-                            Group {
-                                if bottle.inFlight {
-                                    HStack(spacing: 12) {
-                                        Image(systemName: "shippingbox.circle.fill")
-                                            .foregroundStyle(.secondary)
-                                        Text(bottle.settings.name)
-                                        Spacer()
-                                        ProgressView().controlSize(.small)
-                                    }
-                                    .opacity(0.75)
-                                } else {
-                                    BottleListEntry(bottle: bottle, selected: $selected, refresh: $triggerRefresh)
-                                        .selectionDisabled(!bottle.isAvailable)
-                                }
+                    ForEach(filteredBottles) { bottle in
+                        Group {
+                            if bottle.inFlight {
+                                InFlightBottleRow(name: bottle.settings.name)
+                            } else {
+                                BottleListEntry(
+                                    bottle: bottle,
+                                    selected: $selected
+                                )
+                                .selectionDisabled(!bottle.isAvailable)
                             }
-                            .listRowInsets(EdgeInsets(top: 4, leading: 8, bottom: 4, trailing: 8))
-                            .listRowBackground(Color.clear)
-                            .listRowSeparator(useGlassUI ? .hidden : .automatic)
-                            .id(bottle.url)
                         }
+                        .listRowInsets(EdgeInsets(top: 4, leading: 8, bottom: 4, trailing: 8))
+                        .id(bottle.url)
                     }
                 }
                 .listStyle(.sidebar)
                 .searchable(text: $bottleFilter, placement: .sidebar)
-                .scrollContentBackground(useGlassUI ? .hidden : .automatic)
-                .background {
-                    if useGlassUI {
-                        RoundedRectangle(cornerRadius: 28, style: .continuous)
-                            .fill(.ultraThinMaterial)
-                            .overlay {
-                                RoundedRectangle(cornerRadius: 28, style: .continuous)
-                                    .strokeBorder(Color.white.opacity(0.12), lineWidth: 1)
-                            }
+                .overlay {
+                    if filteredBottles.isEmpty, bottlesLoaded {
+                        SidebarEmptyResultsView(hasSearchQuery: !bottleFilter.isEmpty)
                     }
                 }
-                .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
-                .padding(useGlassUI ? 14 : 0)
             }
             .animation(.default, value: bottleVM.bottles)
             .animation(.default, value: bottleFilter)
@@ -219,170 +211,83 @@ struct ContentView: View {
     }
 
     @ViewBuilder
-    var detail: some View {
-        if let bottle = selected {
-            if let bottle = bottleVM.bottles.first(where: { $0.url == bottle }) {
-                BottleView(bottle: bottle)
-                    .disabled(bottle.inFlight)
-                    .id(bottle.url)
-            }
+    private var detail: some View {
+        if let selected,
+           let bottle = bottleVM.bottles.first(where: { $0.url == selected }) {
+            BottleView(bottle: bottle)
+                .disabled(bottle.inFlight)
+                .id(bottle.url)
+        } else if bottlesLoaded, bottleVM.bottles.isEmpty {
+            emptyState
         } else {
-            if (bottleVM.bottles.isEmpty || bottleVM.countActive() == 0) && bottlesLoaded {
-                emptyState
-            }
+            SelectionPlaceholderView(useGlassUI: useGlassUI)
         }
-    }
-
-    private var sidebarHero: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            HStack(alignment: .top, spacing: 16) {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text(appDisplayName)
-                        .font(.system(size: 30, weight: .bold, design: .rounded))
-                    Text("macOS game launcher for GPTK Wine and DOSBox")
-                        .font(.headline)
-                        .foregroundStyle(WhiskyBrandPalette.gold)
-                    Text(currentRuntimeLabel)
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(2)
-                }
-
-                Spacer()
-
-                WhiskyBrandIcon(size: 72)
-            }
-
-            ViewThatFits {
-                HStack(spacing: 8) {
-                    WhiskyGlassBadge(
-                        icon: "shippingbox.fill",
-                        title: "\(bottleVM.bottles.count) Bottles",
-                        tint: .orange
-                    )
-                    WhiskyGlassBadge(
-                        icon: "wineglass.fill",
-                        title: "\(wineBottleCount) Wine",
-                        tint: .pink
-                    )
-                    WhiskyGlassBadge(
-                        icon: "opticaldiscdrive.fill",
-                        title: "\(dosboxBottleCount) DOSBox",
-                        tint: .green
-                    )
-                    WhiskyGlassBadge(
-                        icon: "arrow.down.circle",
-                        title: runnerBadgeLabel,
-                        tint: .blue
-                    )
-                }
-
-                VStack(alignment: .leading, spacing: 8) {
-                    WhiskyGlassBadge(
-                        icon: "shippingbox.fill",
-                        title: "\(bottleVM.bottles.count) Bottles",
-                        tint: .orange
-                    )
-                    WhiskyGlassBadge(
-                        icon: "wineglass.fill",
-                        title: "\(wineBottleCount) Wine",
-                        tint: .pink
-                    )
-                    WhiskyGlassBadge(
-                        icon: "opticaldiscdrive.fill",
-                        title: "\(dosboxBottleCount) DOSBox",
-                        tint: .green
-                    )
-                    WhiskyGlassBadge(
-                        icon: "arrow.down.circle",
-                        title: runnerBadgeLabel,
-                        tint: .blue
-                    )
-                }
-            }
-
-            HStack(spacing: 10) {
-                Button {
-                    showBottleCreation.toggle()
-                } label: {
-                    Label("New Bottle", systemImage: "plus")
-                        .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.borderedProminent)
-                .help("Create a new GPTK Wine bottle or DOSBox game library.")
-
-                SettingsLink {
-                    Label("Settings", systemImage: "slider.horizontal.3")
-                        .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.bordered)
-                .help("Open runtime, appearance, and project settings.")
-            }
-        }
-        .whiskyGlassCard(cornerRadius: 30)
     }
 
     private var emptyState: some View {
         VStack(spacing: 18) {
-            WhiskyBrandIcon(size: 96)
+            WhiskyBrandIcon(size: 88)
 
-            VStack(spacing: 6) {
-                Text("No Bottles Yet")
+            VStack(spacing: 8) {
+                Text("No Libraries Yet")
                     .font(.system(size: 28, weight: .bold, design: .rounded))
-                Text("Create a GPTK Wine bottle for Windows games or a DOSBox library for classic DOS titles.")
+                Text("Create a GPTK Wine bottle for Windows software or a DOSBox library for classic DOS games.")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
-            }
-
-            FlowLayout(spacing: 8) {
-                WhiskyGlassBadge(icon: "shippingbox", title: "Per-game libraries", tint: .orange)
-                WhiskyGlassBadge(icon: "gamecontroller.fill", title: "GPTK runtime", tint: .blue)
-                WhiskyGlassBadge(icon: "opticaldiscdrive.fill", title: "DOSBox Staging", tint: .green)
-                WhiskyGlassBadge(icon: "sparkles", title: "Brand glass UI", tint: WhiskyBrandPalette.amber)
+                    .frame(maxWidth: 420)
             }
 
             Button {
                 showBottleCreation.toggle()
             } label: {
-                Label("Create Bottle", systemImage: "plus")
+                Label("Create Library", systemImage: "plus")
                     .padding(.horizontal, 18)
                     .padding(.vertical, 6)
             }
             .buttonStyle(.borderedProminent)
-            .help("Create your first game library.")
+            .help("Create your first library.")
         }
-        .frame(maxWidth: 420)
-        .whiskyGlassCard(cornerRadius: 30)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .padding(32)
     }
 
     private var runtimeBadgeLabel: String {
-        WhiskyWineInstaller.whiskyWineVersion().map(String.init) ?? "Runtime Missing"
+        WhiskyWineInstaller.currentWineRuntime()?.displayName ?? "Runtime Missing"
     }
 
-    private var runnerBadgeLabel: String {
-        if DOSBox.isInstalled(), let dosboxURL = DOSBox.executableURL() {
-            return dosboxURL.lastPathComponent
-        }
-        return runtimeBadgeLabel
+    private var runtimeReleaseLabel: String {
+        WhiskyWineInstaller.currentWineRuntime()?.versionSummary ?? "No runtime installed"
     }
 
-    private var currentRuntimeLabel: String {
-        let release = WhiskyWineInstaller.runtimeReleaseName() ?? runtimeBadgeLabel
-        let source = WhiskyWineInstaller.runtimeSource() ?? "Runtime not installed"
-        let dosboxSummary = DOSBox.executableURL()?.lastPathComponent ?? "DOSBox missing"
-        return "\(release) via \(source) • DOSBox: \(dosboxSummary)"
+    private var runtimeSourceLabel: String {
+        WhiskyWineInstaller.currentWineRuntime()?.sourceSummary ?? "Runtime not installed"
     }
 
-    var filteredBottles: [Bottle] {
+    private var dosboxStatusLabel: String {
+        DOSBox.executableURL()?.lastPathComponent ?? "Not installed"
+    }
+
+    private var filteredBottles: [Bottle] {
         if bottleFilter.isEmpty {
-            bottleVM.bottles
-                .sorted()
+            bottleVM.bottles.sorted()
         } else {
             bottleVM.bottles
                 .filter { $0.settings.name.localizedCaseInsensitiveContains(bottleFilter) }
                 .sorted()
         }
+    }
+
+    private func applyAppearanceMigrationIfNeeded() {
+        // Earlier releases defaulted into an overbuilt glass-heavy shell. Force one
+        // migration back to the restrained layout so existing installs regain a sane
+        // sidebar/detail hierarchy without requiring a manual Settings change first.
+        guard uiAppearanceRevision < 1 else {
+            return
+        }
+
+        useGlassUI = false
+        uiAppearanceRevision = 1
     }
 
     @MainActor
@@ -405,16 +310,17 @@ struct ContentView: View {
             }
         }
 
-        let packageVersion = package.version
-        let packageSource = package.source
-        let packageReleaseName = package.releaseName
+        let version = package.version
+        let source = package.source
+        let releaseName = package.releaseName
+
         let installed = await withCheckedContinuation { continuation in
             DispatchQueue.global(qos: .userInitiated).async {
                 let installed = WhiskyWineInstaller.install(
                     from: archiveURL,
-                    versionOverride: packageVersion,
-                    source: packageSource,
-                    releaseName: packageReleaseName
+                    versionOverride: version,
+                    source: source,
+                    releaseName: releaseName
                 )
                 continuation.resume(returning: installed)
             }
@@ -426,21 +332,105 @@ struct ContentView: View {
     }
 }
 
-private struct FlowLayout<Content: View>: View {
-    let spacing: CGFloat
-    @ViewBuilder var content: () -> Content
-
-    init(spacing: CGFloat = 8, @ViewBuilder content: @escaping () -> Content) {
-        self.spacing = spacing
-        self.content = content
-    }
+private struct SidebarHeaderView: View {
+    let appDisplayName: String
+    let wineBottleCount: Int
+    let dosboxBottleCount: Int
+    let runtimeLabel: String
+    let runtimeSummary: String
+    let dosboxStatus: String
 
     var body: some View {
-        HStack(spacing: spacing) {
-            content()
-            Spacer(minLength: 0)
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .center, spacing: 12) {
+                WhiskyBrandIcon(size: 42)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(appDisplayName)
+                        .font(.title3.weight(.bold))
+                    Text("Windows and DOS game libraries for macOS")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            VStack(alignment: .leading, spacing: 8) {
+                Label("\(wineBottleCount) GPTK Wine • \(dosboxBottleCount) DOSBox", systemImage: "shippingbox")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                Label("Runtime \(runtimeLabel)", systemImage: "arrow.down.circle")
+                    .font(.caption.weight(.semibold))
+                Text(runtimeSummary)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+                Label("DOSBox \(dosboxStatus)", systemImage: "opticaldiscdrive")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            .help("Installed libraries and runner status.")
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+        .whiskyPanelCard(cornerRadius: 18, padding: 14)
+    }
+}
+
+private struct InFlightBottleRow: View {
+    let name: String
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "shippingbox.circle.fill")
+                .foregroundStyle(.secondary)
+            Text(name)
+            Spacer()
+            ProgressView()
+                .controlSize(.small)
+        }
+        .opacity(0.75)
+    }
+}
+
+private struct SidebarEmptyResultsView: View {
+    let hasSearchQuery: Bool
+
+    var body: some View {
+        ContentUnavailableView(
+            hasSearchQuery ? "No Matching Libraries" : "No Libraries",
+            systemImage: hasSearchQuery ? "magnifyingglass" : "shippingbox",
+            description: Text(hasSearchQuery
+                              ? "Try a different search term."
+                              : "Create a GPTK Wine bottle or DOSBox library to get started.")
+        )
+        .padding()
+    }
+}
+
+private struct SelectionPlaceholderView: View {
+    let useGlassUI: Bool
+
+    var body: some View {
+        VStack(spacing: 14) {
+            Image(systemName: "sidebar.left")
+                .font(.system(size: 42))
+                .foregroundStyle(.secondary)
+            Text("Select a Library")
+                .font(.title2.weight(.semibold))
+            Text("Choose a GPTK Wine bottle or DOSBox library from the sidebar to manage it.")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: 360)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .padding(32)
+        .background {
+            if useGlassUI {
+                RoundedRectangle(cornerRadius: 22, style: .continuous)
+                    .fill(.thinMaterial)
+                    .padding(24)
+            }
+        }
     }
 }
 

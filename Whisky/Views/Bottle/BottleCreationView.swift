@@ -49,10 +49,16 @@ struct BottleCreationView: View {
                 .help("Select the runtime family for this library.")
 
                 VStack(alignment: .leading, spacing: 6) {
-                    Text(newBottleRunner.creationSummary)
+                    Text(newBottleRunner == .wine
+                         ? "Use \(WhiskyWineInstaller.currentWineRuntime()?.displayName ?? "the selected Wine runtime") for modern Windows games."
+                         : newBottleRunner.creationSummary)
                         .font(.subheadline)
                     if newBottleRunner == .dosbox {
                         Text("DOSBox libraries scan the DOS Games folder for .exe, .com, and .bat files.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    } else {
+                        Text(WhiskyWineInstaller.activeWineRuntimeSummary())
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }

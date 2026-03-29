@@ -6,6 +6,44 @@ The format is loosely based on Keep a Changelog and versioned with Semantic Vers
 
 ## [Unreleased]
 
+## [3.3.0] - 2026-03-29
+
+### Added
+
+- Added a runner health scan in Settings so the app can inspect Rosetta, Wine runtime, DOSBox, Homebrew availability, and the recommended stability defaults for this Mac.
+- Added selectable Wine runtime channels for `Managed GPTK Runtime`, `Wine 11 Stable`, `Wine Devel`, and `Wine Staging`.
+- Added Homebrew-backed DOSBox install/update actions directly in the Settings `Runners` tab.
+
+### Changed
+
+- Reworked the Settings `Runners` tab into a compact runner-management surface instead of a static status dump.
+- Updated bottle creation copy so new Windows libraries reflect the currently selected Wine runtime.
+- Updated sidebar runtime summaries to reflect the active runtime channel instead of assuming GPTK-only state.
+
+### Fixed
+
+- Fixed Wine tool launching so external Homebrew Wine builds can use native helper binaries such as `winecfg` and `regedit`.
+- Fixed bottle metadata so discovered Wine versions are no longer reset back to the historical `7.7` default.
+- Fixed runner-status reporting so DOSBox install guidance now includes the current latest Homebrew version.
+
+## [3.2.1] - 2026-03-29
+
+### Changed
+
+- Reworked the main window hierarchy so the sidebar, overview, and library pages now follow a consistent macOS management layout.
+- Replaced the oversized decorative header treatment with compact library panels and a restrained default appearance.
+- Moved primary library actions back above the fold so common tasks are visible without scrolling.
+- Reorganized global controls into tabbed Settings sections for `General`, `Appearance`, `Runners`, `Updates`, and `Resources`.
+- Standardized panel styling across the sidebar, overview cards, quick-launch tiles, and setup surfaces.
+
+### Fixed
+
+- Fixed the sidebar summary so runtime and library statistics no longer collapse into unreadable vertical stacks.
+- Fixed the bottle overview so it no longer duplicates controls or buries the actionable tools section behind decorative content.
+- Fixed the Settings window layout so long option lists no longer overflow a single flat form.
+- Fixed quick-launch tiles to render with consistent card styling whether glass effects are enabled or disabled.
+- Fixed the runtime auto-update install path to avoid capturing a non-Sendable runtime package across threads.
+
 ## [3.2.0] - 2026-03-28
 
 ### Added

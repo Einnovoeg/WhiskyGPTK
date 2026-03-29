@@ -89,8 +89,128 @@ public class WhiskyWineInstaller {
         }
     }
 
+    /// User-selectable Wine runtime families exposed in Settings.
+    ///
+    /// The managed GPTK runtime remains the default because it is the path that
+    /// carries app-managed extras such as DXVK and Winetricks. Homebrew-backed
+    /// Wine selections are offered for users who want upstream Wine 11 builds.
+    public enum RuntimeSelection: String, CaseIterable, Sendable {
+        case gptkManaged
+        case wineStable
+        case wineDevel
+        case wineStaging
+
+        public var displayName: String {
+            switch self {
+            case .gptkManaged:
+                return "Managed GPTK Runtime"
+            case .wineStable:
+                return "Wine 11 Stable"
+            case .wineDevel:
+                return "Wine Devel"
+            case .wineStaging:
+                return "Wine Staging"
+            }
+        }
+
+        public var summary: String {
+            switch self {
+            case .gptkManaged:
+                return "App-managed Game Porting Toolkit runtime with integrated extras."
+            case .wineStable:
+                return "Homebrew-installed stable Wine build from the official WineHQ macOS packages."
+            case .wineDevel:
+                return "Homebrew-installed development Wine build for newer upstream fixes."
+            case .wineStaging:
+                return "Homebrew-installed staging Wine build with staging patches."
+            }
+        }
+
+        fileprivate var externalRuntime: ExternalWineRuntime? {
+            switch self {
+            case .gptkManaged:
+                return nil
+            case .wineStable:
+                return .stable
+            case .wineDevel:
+                return .devel
+            case .wineStaging:
+                return .staging
+            }
+        }
+    }
+
+    public struct ActiveWineRuntime: Sendable {
+        public let selection: RuntimeSelection
+        public let displayName: String
+        public let versionSummary: String
+        public let sourceSummary: String
+        public let wineBinaryURL: URL
+        public let wineserverBinaryURL: URL
+        public let binDirectoryURL: URL
+        public let supportsManagedExtras: Bool
+    }
+
+    private static let selectedRuntimeKey = "selectedWineRuntimeSelection"
+
+    public static func selectedRuntimeSelection() -> RuntimeSelection {
+        if let rawValue = UserDefaults.standard.string(forKey: selectedRuntimeKey),
+           let selection = RuntimeSelection(rawValue: rawValue) {
+            return selection
+        }
+        return .gptkManaged
+    }
+
+    public static func setSelectedRuntimeSelection(_ selection: RuntimeSelection) {
+        UserDefaults.standard.set(selection.rawValue, forKey: selectedRuntimeKey)
+    }
+
+    public static func currentWineRuntime() -> ActiveWineRuntime? {
+        if let selectedRuntime = runtimeForSelection(selectedRuntimeSelection()) {
+            return selectedRuntime
+        }
+        return runtimeForSelection(.gptkManaged)
+    }
+
+    public static func activeWineRuntimeSummary() -> String {
+        guard let runtime = currentWineRuntime() else {
+            return "No Wine runtime installed"
+        }
+        return "\(runtime.displayName) · \(runtime.versionSummary) · \(runtime.sourceSummary)"
+    }
+
+    public static func wineBinaryURL() -> URL? {
+        currentWineRuntime()?.wineBinaryURL
+    }
+
+    public static func wineserverBinaryURL() -> URL? {
+        currentWineRuntime()?.wineserverBinaryURL
+    }
+
+    public static func wineBinDirectoryURL() -> URL? {
+        currentWineRuntime()?.binDirectoryURL
+    }
+
+    public static func wineToolBinaryURL(named name: String) -> URL? {
+        if currentWineRuntime()?.supportsManagedExtras == true {
+            let candidate = binFolder.appending(path: name)
+            if FileManager.default.isExecutableFile(atPath: candidate.path(percentEncoded: false)) {
+                return candidate
+            }
+        }
+
+        guard let externalRuntime = currentWineRuntime()?.selection.externalRuntime else {
+            return nil
+        }
+        return externalRuntime.toolBinaryURL(named: name)
+    }
+
+    public static func supportsManagedRuntimeExtras() -> Bool {
+        currentWineRuntime()?.supportsManagedExtras ?? false
+    }
+
     public static func isWhiskyWineInstalled() -> Bool {
-        whiskyWineVersion() != nil
+        currentWineRuntime() != nil
     }
 
     /// Installs a runtime from either an archive or a local extracted directory.
@@ -194,6 +314,10 @@ public class WhiskyWineInstaller {
     }
 
     public static func shouldUpdateWhiskyWine() async -> (Bool, SemanticVersion) {
+        guard selectedRuntimeSelection() == .gptkManaged else {
+            return (false, SemanticVersion(0, 0, 0))
+        }
+
         let localVersion = whiskyWineVersion()
         let remoteVersion = await latestRuntimePackage()?.version
 
@@ -221,13 +345,19 @@ public class WhiskyWineInstaller {
     }
 
     public static func hasDXVKRuntime() -> Bool {
-        FileManager.default.fileExists(
+        guard supportsManagedRuntimeExtras() else {
+            return false
+        }
+        return FileManager.default.fileExists(
             atPath: libraryFolder.appending(path: "DXVK").appending(path: "x64").path
         )
     }
 
     public static func hasWinetricksRuntime() -> Bool {
-        FileManager.default.fileExists(atPath: libraryFolder.appending(path: "winetricks").path)
+        guard supportsManagedRuntimeExtras() else {
+            return false
+        }
+        return FileManager.default.fileExists(atPath: libraryFolder.appending(path: "winetricks").path)
     }
 
     /// Detects a directly usable local GPTK runtime on disk, including mounted
@@ -262,6 +392,68 @@ public class WhiskyWineInstaller {
         }
 
         return nil
+    }
+
+    private static func runtimeForSelection(_ selection: RuntimeSelection) -> ActiveWineRuntime? {
+        switch selection {
+        case .gptkManaged:
+            return managedRuntime()
+        case .wineStable, .wineDevel, .wineStaging:
+            guard let externalRuntime = selection.externalRuntime else {
+                return nil
+            }
+            return externalRuntimeInfo(for: externalRuntime, selection: selection)
+        }
+    }
+
+    private static func managedRuntime() -> ActiveWineRuntime? {
+        let wineBinaryCandidates = [
+            binFolder.appending(path: "wine64"),
+            binFolder.appending(path: "wine")
+        ]
+        let wineserverBinaryURL = binFolder.appending(path: "wineserver")
+
+        guard let wineBinaryURL = wineBinaryCandidates.first(where: {
+            FileManager.default.isExecutableFile(atPath: $0.path(percentEncoded: false))
+        }),
+              FileManager.default.isExecutableFile(atPath: wineserverBinaryURL.path(percentEncoded: false)) else {
+            return nil
+        }
+
+        let versionSummary = runtimeVersionInfo()?.version.description ?? "Unknown version"
+        let sourceSummary = runtimeSource() ?? "Managed GPTK Runtime"
+        return ActiveWineRuntime(
+            selection: .gptkManaged,
+            displayName: "GPTK Wine",
+            versionSummary: versionSummary,
+            sourceSummary: sourceSummary,
+            wineBinaryURL: wineBinaryURL,
+            wineserverBinaryURL: wineserverBinaryURL,
+            binDirectoryURL: binFolder,
+            supportsManagedExtras: true
+        )
+    }
+
+    private static func externalRuntimeInfo(
+        for runtime: ExternalWineRuntime,
+        selection: RuntimeSelection
+    ) -> ActiveWineRuntime? {
+        guard let wineBinaryURL = runtime.wineBinaryURL,
+              let wineserverBinaryURL = runtime.wineserverBinaryURL,
+              let binDirectoryURL = runtime.binDirectoryURL else {
+            return nil
+        }
+
+        return ActiveWineRuntime(
+            selection: selection,
+            displayName: runtime.displayName,
+            versionSummary: runtime.installedVersion ?? "Installed",
+            sourceSummary: "Homebrew Cask",
+            wineBinaryURL: wineBinaryURL,
+            wineserverBinaryURL: wineserverBinaryURL,
+            binDirectoryURL: binDirectoryURL,
+            supportsManagedExtras: false
+        )
     }
 
     private static func runtimeVersionInfo() -> WhiskyWineVersion? {

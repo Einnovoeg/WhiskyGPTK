@@ -23,7 +23,7 @@ import Progress
 import SemanticVersion
 import ArgumentParser
 
-extension BottleRunner: ExpressibleByArgument {}
+extension BottleRunner: @retroactive ExpressibleByArgument {}
 
 @main
 struct Whisky: ParsableCommand {

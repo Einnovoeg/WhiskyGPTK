@@ -23,9 +23,13 @@ public class Wine {
     /// URL to the installed `DXVK` folder
     private static let dxvkFolder: URL = WhiskyWineInstaller.libraryFolder.appending(path: "DXVK")
     /// Path to the `wine64` binary
-    public static let wineBinary: URL = WhiskyWineInstaller.binFolder.appending(path: "wine64")
+    public static var wineBinary: URL {
+        WhiskyWineInstaller.wineBinaryURL() ?? WhiskyWineInstaller.binFolder.appending(path: "wine64")
+    }
     /// Parth to the `wineserver` binary
-    private static let wineserverBinary: URL = WhiskyWineInstaller.binFolder.appending(path: "wineserver")
+    private static var wineserverBinary: URL {
+        WhiskyWineInstaller.wineserverBinaryURL() ?? WhiskyWineInstaller.binFolder.appending(path: "wineserver")
+    }
 
     /// Run a process on a executable file given by the `executableURL`
     private static func runProcess(
@@ -129,20 +133,23 @@ public class Wine {
     }
 
     public static func generateTerminalEnvironmentCommand(bottle: Bottle) -> String {
+        let binDirectory = WhiskyWineInstaller.wineBinDirectoryURL() ?? WhiskyWineInstaller.binFolder
+        let wineBinaryName = wineBinary.lastPathComponent
         var cmd = """
-        export PATH=\"\(WhiskyWineInstaller.binFolder.path):$PATH\"
-        export WINE=\"wine64\"
-        alias wine=\"wine64\"
-        alias winecfg=\"wine64 winecfg\"
-        alias msiexec=\"wine64 msiexec\"
-        alias regedit=\"wine64 regedit\"
-        alias regsvr32=\"wine64 regsvr32\"
-        alias wineboot=\"wine64 wineboot\"
-        alias wineconsole=\"wine64 wineconsole\"
-        alias winedbg=\"wine64 winedbg\"
-        alias winefile=\"wine64 winefile\"
-        alias winepath=\"wine64 winepath\"
+        export PATH=\"\(binDirectory.path):$PATH\"
+        export WINE=\"\(wineBinaryName)\"
+        alias wine=\"\(wineBinary.path.esc)\"
         """
+
+        cmd += "\n" + shellAlias(named: "winecfg", fallback: "\(wineBinaryName) winecfg")
+        cmd += "\n" + shellAlias(named: "msiexec", fallback: "\(wineBinaryName) msiexec")
+        cmd += "\n" + shellAlias(named: "regedit", fallback: "\(wineBinaryName) regedit")
+        cmd += "\n" + shellAlias(named: "regsvr32", fallback: "\(wineBinaryName) regsvr32")
+        cmd += "\n" + shellAlias(named: "wineboot", fallback: "\(wineBinaryName) wineboot")
+        cmd += "\n" + shellAlias(named: "wineconsole", fallback: "\(wineBinaryName) wineconsole")
+        cmd += "\n" + shellAlias(named: "winedbg", fallback: "\(wineBinaryName) winedbg")
+        cmd += "\n" + shellAlias(named: "winefile", fallback: "\(wineBinaryName) winefile")
+        cmd += "\n" + shellAlias(named: "winepath", fallback: "\(wineBinaryName) winepath")
 
         let env = constructWineEnvironment(for: bottle, environment: constructWineEnvironment(for: bottle))
         for environment in env {
@@ -150,6 +157,41 @@ public class Wine {
         }
 
         return cmd
+    }
+
+    private static func shellAlias(named name: String, fallback: String) -> String {
+        if let toolURL = WhiskyWineInstaller.wineToolBinaryURL(named: name) {
+            return "alias \(name)=\(toolURL.path.esc)"
+        }
+        return "alias \(name)=\(fallback.esc)"
+    }
+
+    private static func runWineTool(_ tool: String, args: [String], bottle: Bottle) async throws -> String {
+        if let executableURL = WhiskyWineInstaller.wineToolBinaryURL(named: tool) {
+            var result: [String] = []
+            let fileHandle = try makeFileHandle()
+            fileHandle.writeApplicationInfo()
+            fileHandle.writeInfo(for: bottle)
+
+            let environment = constructWineEnvironment(for: bottle)
+            for await output in try runProcess(
+                name: tool,
+                args: args,
+                environment: environment,
+                executableURL: executableURL,
+                fileHandle: fileHandle
+            ) {
+                switch output {
+                case .started, .terminated:
+                    break
+                case .message(let message), .error(let message):
+                    result.append(message)
+                }
+            }
+            return result.joined()
+        }
+
+        return try await Wine.runWine([tool] + args, bottle: bottle)
     }
 
     /// Run a `wineserver` command with the given arguments and return the output result
@@ -394,16 +436,16 @@ extension Wine {
 
     @discardableResult
     public static func regedit(bottle: Bottle) async throws -> String {
-        return try await Wine.runWine(["regedit"], bottle: bottle)
+        return try await runWineTool("regedit", args: [], bottle: bottle)
     }
 
     @discardableResult
     public static func cfg(bottle: Bottle) async throws -> String {
-        return try await Wine.runWine(["winecfg"], bottle: bottle)
+        return try await runWineTool("winecfg", args: [], bottle: bottle)
     }
 
     @discardableResult
     public static func changeWinVersion(bottle: Bottle, win: WinVersion) async throws -> String {
-        return try await Wine.runWine(["winecfg", "-v", win.rawValue], bottle: bottle)
+        return try await runWineTool("winecfg", args: ["-v", win.rawValue], bottle: bottle)
     }
 }

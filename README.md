@@ -5,8 +5,8 @@ It provides a native SwiftUI interface for running Windows games and apps on App
 
 Current maintained release:
 
-- Version: `3.2.0`
-- Release date: `2026-03-28`
+- Version: `3.3.0`
+- Release date: `2026-03-29`
 - App bundle: `Whisky GPTK`
 - Product: `WhiskyGPTK.app`
 
@@ -22,8 +22,10 @@ Current maintained release:
 - Creates and manages GPTK Wine bottles for Windows games and apps.
 - Creates DOSBox libraries for classic DOS games.
 - Installs and updates a maintained GPTK-based runtime.
+- Selects between the managed GPTK runtime and Homebrew Wine 11/WineHQ builds from inside the app.
 - Detects local Game Porting Toolkit volumes and optional Apple `redist` overlays.
-- Detects DOSBox Staging installations, supports a manual DOSBox binary override, and generates per-library DOSBox config files.
+- Detects DOSBox Staging installations, can install or update DOSBox through Homebrew, supports a manual DOSBox binary override, and generates per-library DOSBox config files.
+- Scans the current Mac and applies recommended stability defaults for App Nap and runner updates.
 - Exposes common bottle actions such as opening `C:` drive or DOS games folders, terminal access, Winetricks, and shader cache cleanup.
 - Includes a refreshed macOS-style interface with optional glass effects.
 - Includes `WhiskyCmd` for basic command-line bottle management.
@@ -35,6 +37,7 @@ Current maintained release:
 - Xcode 26.3 or later to build from source
 - Swift Package Manager access for package dependencies
 - Homebrew `cabextract` if you want Winetricks support in public builds
+- Homebrew if you want one-click Wine 11 and DOSBox installs from inside the app
 - DOSBox Staging if you want native DOS game support
 
 ## Install
@@ -49,6 +52,8 @@ Current maintained release:
 5. Launch `WhiskyGPTK.app` from Xcode or the generated build products.
 6. Install DOSBox Staging if you want DOS libraries:
    - `brew install dosbox-staging`
+7. Optionally install a native Wine 11 runtime if you want to switch away from the managed GPTK runtime:
+   - `brew install --cask wine-stable`
 
 ### Option 2: GitHub Release
 
@@ -78,7 +83,7 @@ brew install dosbox-staging
 
 ## Runner Model
 
-Whisky GPTK now supports two runner types:
+Whisky GPTK now supports two library runner types:
 
 1. `GPTK Wine`
    - For Windows games and apps
@@ -89,6 +94,7 @@ Whisky GPTK now supports two runner types:
    - Stores a generated `dosbox-staging.conf` alongside the library metadata
 
 This is deliberately similar to the runner model popularized by tools like Lutris, but scoped to a native macOS app and the runtimes that make sense here.
+Lutris itself is not exposed as a fake runtime option because the project remains Linux-first and does not ship a supported native macOS runner.
 
 ## Wine 11.0 Notes
 
@@ -102,6 +108,19 @@ Wine 11.0 brought major upstream work in two areas that matter to this fork:
    - This fork is structured so newer upstream Wine/GPTK runtime changes can be adopted without conflating Windows and DOS library management
 
 For DOS-era games, DOSBox Staging is still the correct compatibility path.
+
+## Runner Management
+
+The Settings window now includes a dedicated `Runners` tab that can:
+
+1. Scan the current Mac for Rosetta, Wine runtime, DOSBox, and stability defaults
+2. Apply recommended defaults such as disabling App Nap and enabling GPTK runtime update checks
+3. Switch the active Wine runtime between:
+   - `Managed GPTK Runtime`
+   - `Wine 11 Stable`
+   - `Wine Devel`
+   - `Wine Staging`
+4. Install or update DOSBox Staging through Homebrew
 
 ## Upstream Reference Points
 

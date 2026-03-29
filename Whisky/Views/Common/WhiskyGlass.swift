@@ -50,13 +50,17 @@ extension View {
         modifier(WhiskyWindowBackground())
     }
 
+    func whiskyPanelCard(cornerRadius: CGFloat = 22, padding: CGFloat = 16) -> some View {
+        modifier(WhiskyPanelCard(cornerRadius: cornerRadius, padding: padding))
+    }
+
     func whiskyGlassCard(cornerRadius: CGFloat = 22) -> some View {
         modifier(WhiskyGlassCard(cornerRadius: cornerRadius))
     }
 }
 
 struct WhiskyGlassBadge: View {
-    @AppStorage("useGlassUI") private var useGlassUI = true
+    @AppStorage("useGlassUI") private var useGlassUI = false
     let icon: String
     let title: String
     var tint: Color = .accentColor
@@ -78,24 +82,10 @@ struct WhiskyGlassBadge: View {
         .background {
             if useGlassUI {
                 Capsule(style: .continuous)
-                    .fill(.thinMaterial)
+                    .fill(tint.opacity(0.12))
                     .overlay {
                         Capsule(style: .continuous)
-                            .strokeBorder(Color.white.opacity(0.18), lineWidth: 1)
-                    }
-                    .overlay {
-                        Capsule(style: .continuous)
-                            .fill(
-                                LinearGradient(
-                                    colors: [
-                                        WhiskyBrandPalette.gold.opacity(0.08),
-                                        Color.clear,
-                                        WhiskyBrandPalette.copper.opacity(0.12)
-                                    ],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                )
-                            )
+                            .strokeBorder(tint.opacity(0.18), lineWidth: 1)
                     }
             } else {
                 Capsule(style: .continuous)
@@ -106,7 +96,7 @@ struct WhiskyGlassBadge: View {
 }
 
 private struct WhiskyWindowBackground: ViewModifier {
-    @AppStorage("useGlassUI") private var useGlassUI = true
+    @AppStorage("useGlassUI") private var useGlassUI = false
 
     func body(content: Content) -> some View {
         if useGlassUI {
@@ -117,9 +107,9 @@ private struct WhiskyWindowBackground: ViewModifier {
                             .fill(
                                 LinearGradient(
                                     colors: [
-                                        WhiskyBrandPalette.smoke,
-                                        WhiskyBrandPalette.slate,
-                                        Color(red: 0.27, green: 0.14, blue: 0.11)
+                                        Color(red: 0.13, green: 0.14, blue: 0.17),
+                                        Color(red: 0.11, green: 0.12, blue: 0.15),
+                                        Color(red: 0.12, green: 0.10, blue: 0.09)
                                     ],
                                     startPoint: .topLeading,
                                     endPoint: .bottomTrailing
@@ -129,9 +119,9 @@ private struct WhiskyWindowBackground: ViewModifier {
 
                         LinearGradient(
                             colors: [
-                                WhiskyBrandPalette.gold.opacity(0.20),
+                                WhiskyBrandPalette.gold.opacity(0.08),
                                 Color.clear,
-                                WhiskyBrandPalette.copper.opacity(0.24)
+                                WhiskyBrandPalette.copper.opacity(0.10)
                             ],
                             startPoint: .top,
                             endPoint: .bottomTrailing
@@ -139,34 +129,16 @@ private struct WhiskyWindowBackground: ViewModifier {
                         .ignoresSafeArea()
 
                         Circle()
-                            .fill(WhiskyBrandPalette.gold.opacity(0.16))
-                            .frame(width: 520, height: 520)
-                            .blur(radius: 72)
-                            .offset(x: -240, y: -220)
-
-                        Circle()
-                            .fill(WhiskyBrandPalette.copper.opacity(0.28))
+                            .fill(WhiskyBrandPalette.gold.opacity(0.08))
                             .frame(width: 420, height: 420)
-                            .blur(radius: 72)
-                            .offset(x: 260, y: 200)
+                            .blur(radius: 80)
+                            .offset(x: -220, y: -180)
 
                         Circle()
-                            .fill(WhiskyBrandPalette.amber.opacity(0.14))
-                            .frame(width: 320, height: 320)
-                            .blur(radius: 56)
-                            .offset(x: -280, y: 240)
-
-                        RoundedRectangle(cornerRadius: 90, style: .continuous)
-                            .fill(Color.white.opacity(0.05))
-                            .frame(width: 520, height: 180)
-                            .blur(radius: 32)
-                            .rotationEffect(.degrees(-18))
-                            .offset(x: 170, y: -150)
-
-                        RoundedRectangle(cornerRadius: 42, style: .continuous)
-                            .strokeBorder(Color.white.opacity(0.08), lineWidth: 1)
-                            .padding(16)
-                            .ignoresSafeArea()
+                            .fill(WhiskyBrandPalette.copper.opacity(0.10))
+                            .frame(width: 360, height: 360)
+                            .blur(radius: 80)
+                            .offset(x: 220, y: 170)
                     }
                 }
         } else {
@@ -176,7 +148,7 @@ private struct WhiskyWindowBackground: ViewModifier {
 }
 
 private struct WhiskyGlassCard: ViewModifier {
-    @AppStorage("useGlassUI") private var useGlassUI = true
+    @AppStorage("useGlassUI") private var useGlassUI = false
     let cornerRadius: CGFloat
 
     func body(content: Content) -> some View {
@@ -184,45 +156,50 @@ private struct WhiskyGlassCard: ViewModifier {
             content
                 .padding(16)
                 .background(
-                    .ultraThinMaterial,
+                    .regularMaterial,
                     in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
                 )
                 .overlay {
                     RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                        .strokeBorder(Color.white.opacity(0.16), lineWidth: 1)
+                        .strokeBorder(Color.white.opacity(0.12), lineWidth: 1)
                 }
-                .overlay {
-                    RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                        .fill(
-                            LinearGradient(
-                                colors: [
-                                    WhiskyBrandPalette.gold.opacity(0.10),
-                                    Color.clear,
-                                    WhiskyBrandPalette.copper.opacity(0.10)
-                                ],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
-                }
-                .overlay(alignment: .topLeading) {
-                    RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                        .fill(
-                            LinearGradient(
-                                colors: [
-                                    Color.white.opacity(0.18),
-                                    Color.clear
-                                ],
-                                startPoint: .topLeading,
-                                endPoint: .center
-                            )
-                        )
-                        .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
-                        .blendMode(.screen)
-                }
-                .shadow(color: .black.opacity(0.18), radius: 24, x: 0, y: 16)
+                .shadow(color: .black.opacity(0.12), radius: 16, x: 0, y: 10)
         } else {
             content
         }
+    }
+}
+
+private struct WhiskyPanelCard: ViewModifier {
+    @AppStorage("useGlassUI") private var useGlassUI = false
+    let cornerRadius: CGFloat
+    let padding: CGFloat
+
+    func body(content: Content) -> some View {
+        content
+            .padding(padding)
+            .background {
+                if useGlassUI {
+                    RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                        .fill(.regularMaterial)
+                        .overlay {
+                            RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                                .strokeBorder(Color.white.opacity(0.12), lineWidth: 1)
+                        }
+                } else {
+                    RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                        .fill(Color(nsColor: .controlBackgroundColor))
+                        .overlay {
+                            RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                                .strokeBorder(Color.black.opacity(0.08), lineWidth: 1)
+                        }
+                }
+            }
+            .shadow(
+                color: .black.opacity(useGlassUI ? 0.12 : 0.04),
+                radius: useGlassUI ? 16 : 8,
+                x: 0,
+                y: useGlassUI ? 10 : 4
+            )
     }
 }
