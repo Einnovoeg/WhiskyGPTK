@@ -523,6 +523,7 @@ private struct BottleDetailsSection: View {
         DisclosureGroup("Library Details", isExpanded: $showsDetails) {
             Grid(alignment: .leading, horizontalSpacing: 18, verticalSpacing: 10) {
                 BottleDetailRow(label: "Runner", value: bottle.runner.displayName)
+                BottleDetailRow(label: "Preset", value: bottle.settings.appliedPreset?.displayName ?? "Custom")
                 BottleDetailRow(label: "Path", value: bottle.url.path(percentEncoded: false), selectable: true)
                 BottleDetailRow(label: "Pinned Programs", value: String(bottle.pinnedPrograms.count))
 

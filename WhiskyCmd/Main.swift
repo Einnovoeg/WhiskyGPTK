@@ -24,6 +24,7 @@ import SemanticVersion
 import ArgumentParser
 
 extension BottleRunner: @retroactive ExpressibleByArgument {}
+extension BottlePreset: @retroactive ExpressibleByArgument {}
 
 @main
 struct Whisky: ParsableCommand {
@@ -51,16 +52,19 @@ extension Whisky {
 
             let nameCol = TextTableColumn(header: "Name")
             let runnerCol = TextTableColumn(header: "Runner")
+            let presetCol = TextTableColumn(header: "Preset")
             let profileCol = TextTableColumn(header: "Profile")
             let pathCol = TextTableColumn(header: "Path")
 
-            var table = TextTable(columns: [nameCol, runnerCol, profileCol, pathCol])
+            var table = TextTable(columns: [nameCol, runnerCol, presetCol, profileCol, pathCol])
             for bottle in bottles {
                 let profile = bottle.runner == .wine
                     ? bottle.settings.windowsVersion.pretty()
                     : bottle.settings.dosboxCycles.displayName
+                let preset = bottle.settings.appliedPreset?.displayName ?? "Custom"
                 table.addRow(values: [bottle.settings.name,
                                       bottle.runner.displayName,
+                                      preset,
                                       profile,
                                       bottle.url.prettyPath()])
             }
@@ -74,12 +78,15 @@ extension Whisky {
 
         @Argument var name: String
         @Option(name: .shortAndLong, help: "Runner to use: wine or dosbox.") var runner: BottleRunner = .wine
+        @Option(name: .shortAndLong, help: "Compatibility preset to apply.") var preset: BottlePreset?
 
         mutating func run() throws {
             let bottleURL = BottleData.defaultBottleDir.appending(path: UUID().uuidString)
+            let resolvedPreset = preset ?? BottlePreset.defaultPreset(for: runner)
+            let resolvedRunner = resolvedPreset.runner
 
             do {
-                switch runner {
+                switch resolvedRunner {
                 case .wine:
                     try FileManager.default.createDirectory(atPath: bottleURL.path(percentEncoded: false),
                                                             withIntermediateDirectories: true)
@@ -88,18 +95,17 @@ extension Whisky {
                 }
 
                 let bottle = Bottle(bottleUrl: bottleURL, inFlight: true)
-                // Should allow customisation
-                bottle.settings.bottleRunner = runner
-                bottle.settings.windowsVersion = .win10
+                bottle.settings.apply(preset: resolvedPreset)
+                bottle.settings.bottleRunner = resolvedRunner
                 bottle.settings.name = name
                 bottle.settings.wineVersion = SemanticVersion(0, 0, 0)
-                if runner == .dosbox {
+                if resolvedRunner == .dosbox {
                     try DOSBox.writeConfiguration(for: bottle)
                 }
 
                 var bottlesList = BottleData()
                 _ = bottlesList.registerBottlePath(bottleURL)
-                print("Created new \(runner.displayName) bottle \"\(name)\".")
+                print("Created new \(resolvedRunner.displayName) bottle \"\(name)\" using the \(resolvedPreset.displayName) preset.")
             } catch {
                 throw ValidationError("\(error)")
             }

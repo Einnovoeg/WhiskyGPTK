@@ -48,7 +48,8 @@ final class BottleVM: ObservableObject, @unchecked Sendable {
         bottleName: String,
         winVersion: WinVersion,
         runner: BottleRunner,
-        bottleURL: URL
+        bottleURL: URL,
+        preset: BottlePreset? = nil
     ) -> URL {
         let newBottleDir = bottleURL.appending(path: UUID().uuidString)
 
@@ -65,9 +66,14 @@ final class BottleVM: ObservableObject, @unchecked Sendable {
 
                 let bottle = Bottle(bottleUrl: newBottleDir, inFlight: true)
                 bottleId = bottle
+                if let preset {
+                    bottle.settings.apply(preset: preset)
+                }
                 bottle.settings.name = bottleName
                 bottle.settings.bottleRunner = runner
-                bottle.settings.windowsVersion = winVersion
+                if runner == .wine {
+                    bottle.settings.windowsVersion = winVersion
+                }
 
                 await MainActor.run {
                     // Register the path before prefix creation completes so the

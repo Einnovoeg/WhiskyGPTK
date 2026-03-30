@@ -29,9 +29,11 @@ enum LoadingState {
 
 struct ConfigView: View {
     @ObservedObject var bottle: Bottle
+    @State private var selectedPreset: BottlePreset = .windowsGame
     @State private var buildVersion: Int = 0
     @State private var retinaMode: Bool = false
     @State private var dpiConfig: Int = 96
+    @State private var presetApplyingState: LoadingState = .success
     @State private var winVersionLoadingState: LoadingState = .loading
     @State private var buildVersionLoadingState: LoadingState = .loading
     @State private var retinaModeLoadingState: LoadingState = .loading
@@ -45,6 +47,7 @@ struct ConfigView: View {
 
     var body: some View {
         Form {
+            presetSection
             if bottle.runner == .wine {
                 wineSections
             } else {
@@ -114,6 +117,7 @@ struct ConfigView: View {
         }
         .navigationTitle("tab.config")
         .onAppear {
+            initializePresetSelection()
             if bottle.runner == .wine {
                 loadWineConfiguration()
             } else {
@@ -123,6 +127,11 @@ struct ConfigView: View {
         .onChange(of: bottle.settings) { _, _ in
             guard bottle.runner == .dosbox else { return }
             try? DOSBox.writeConfiguration(for: bottle)
+        }
+        .onChange(of: bottle.runner) { _, runner in
+            selectedPreset = bottle.settings.appliedPreset
+                .flatMap { $0.runner == runner ? $0 : nil }
+                ?? BottlePreset.defaultPreset(for: runner)
         }
         .onChange(of: bottle.settings.windowsVersion) { _, newValue in
             guard bottle.runner == .wine else { return }
@@ -154,6 +163,38 @@ struct ConfigView: View {
                         print(error)
                         dpiConfigLoadingState = .failed
                     }
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var presetSection: some View {
+        Section("Compatibility Preset") {
+            Picker("Preset", selection: $selectedPreset) {
+                ForEach(compatiblePresets) { preset in
+                    Label(preset.displayName, systemImage: preset.systemImage)
+                        .tag(preset)
+                }
+            }
+            .help("Apply a curated compatibility recipe for this library's current runner.")
+
+            BottlePresetSummaryCard(preset: selectedPreset)
+            BottlePresetChecklistView(preset: selectedPreset)
+
+            HStack {
+                Button(presetApplyingState == .modifying ? "Applying…" : "Apply Preset") {
+                    Task {
+                        await applySelectedPreset()
+                    }
+                }
+                .disabled(presetApplyingState == .modifying)
+                .help("Reapply the selected compatibility preset to this library.")
+
+                if presetApplyingState == .failed {
+                    Text("Failed to apply the selected preset.")
+                        .font(.caption)
+                        .foregroundStyle(.red)
                 }
             }
         }
@@ -367,6 +408,10 @@ struct ConfigView: View {
         ]
     }
 
+    private var compatiblePresets: [BottlePreset] {
+        BottlePreset.presets(for: bottle.runner)
+    }
+
     private var dosboxLaunchButtonTitle: String {
         bottle.settings.dosboxStartupProgram == nil ? "Launch DOSBox" : "Launch Default Game"
     }
@@ -378,6 +423,34 @@ struct ConfigView: View {
             } catch {
                 print("Failed to launch DOSBox: \(error)")
             }
+        }
+    }
+
+    @MainActor
+    private func initializePresetSelection() {
+        selectedPreset = bottle.settings.appliedPreset
+            .flatMap { $0.runner == bottle.runner ? $0 : nil }
+            ?? BottlePreset.defaultPreset(for: bottle.runner)
+    }
+
+    @MainActor
+    private func applySelectedPreset() async {
+        presetApplyingState = .modifying
+        let previousSettings = bottle.settings
+        bottle.settings.apply(preset: selectedPreset)
+
+        do {
+            switch bottle.runner {
+            case .wine:
+                try await Wine.changeWinVersion(bottle: bottle, win: bottle.settings.windowsVersion)
+                loadWineConfiguration()
+            case .dosbox:
+                try DOSBox.writeConfiguration(for: bottle)
+            }
+            presetApplyingState = .success
+        } catch {
+            bottle.settings = previousSettings
+            presetApplyingState = .failed
         }
     }
 

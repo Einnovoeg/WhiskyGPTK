@@ -5,7 +5,7 @@ It provides a native SwiftUI interface for running Windows games and apps on App
 
 Current maintained release:
 
-- Version: `3.3.0`
+- Version: `3.4.0`
 - Release date: `2026-03-29`
 - App bundle: `Whisky GPTK`
 - Product: `WhiskyGPTK.app`
@@ -21,6 +21,7 @@ Current maintained release:
 
 - Creates and manages GPTK Wine bottles for Windows games and apps.
 - Creates DOSBox libraries for classic DOS games.
+- Starts new libraries from curated compatibility presets instead of forcing every user through a blank manual setup.
 - Installs and updates a maintained GPTK-based runtime.
 - Selects between the managed GPTK runtime and Homebrew Wine 11/WineHQ builds from inside the app.
 - Detects local Game Porting Toolkit volumes and optional Apple `redist` overlays.
@@ -54,6 +55,23 @@ Current maintained release:
    - `brew install dosbox-staging`
 7. Optionally install a native Wine 11 runtime if you want to switch away from the managed GPTK runtime:
    - `brew install --cask wine-stable`
+
+## Compatibility Presets
+
+Whisky GPTK now includes curated presets so new libraries start from a sane baseline:
+
+1. `Windows Game`
+   - Balanced GPTK-first defaults for most modern Windows games
+2. `Game Launcher`
+   - Safer defaults for Steam, Epic, Battle.net, GOG Galaxy, and patchers
+3. `Windows Utility`
+   - Conservative defaults for installers, mod tools, and productivity apps
+4. `Classic DOS Game`
+   - DOSBox profile with stable mouse capture and a CRT-style scaler
+5. `Blank Wine Bottle` / `Blank DOS Library`
+   - Manual-first starting points for advanced setups
+
+The same presets are exposed in the creation sheet, the bottle `Config` tab, and the `WhiskyCmd create --preset ...` CLI flow.
 
 ### Option 2: GitHub Release
 
@@ -121,6 +139,7 @@ The Settings window now includes a dedicated `Runners` tab that can:
    - `Wine Devel`
    - `Wine Staging`
 4. Install or update DOSBox Staging through Homebrew
+5. Start a new bottle from a compatibility preset and reapply presets later from the bottle `Config` tab
 
 ## Upstream Reference Points
 

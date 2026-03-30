@@ -6,6 +6,25 @@ The format is loosely based on Keep a Changelog and versioned with Semantic Vers
 
 ## [Unreleased]
 
+## [3.4.0] - 2026-03-29
+
+### Added
+
+- Added curated compatibility presets for Windows games, launchers, utilities, blank Wine bottles, blank DOS libraries, and classic DOS games.
+- Added preset-first bottle creation so new libraries start from a known-good recipe instead of a flat manual form.
+- Added preset reapply support in each bottle's `Config` tab and preset visibility in bottle details and CLI listings.
+- Added `WhiskyCmd create --preset ...` support so CLI users can create bottles from the same compatibility model as the GUI.
+
+### Changed
+
+- Reworked the bottle creation sheet so the preset and core library fields are primary while advanced overrides stay collapsed until needed.
+- Kept the main window quiet by placing compatibility retuning in the `Config` tab rather than adding more top-level controls.
+
+### Fixed
+
+- Fixed bottle metadata persistence so the last applied preset now survives reloads and can be inspected later.
+- Fixed the mismatch between GUI creation defaults and CLI creation defaults by routing both through the same preset model.
+
 ## [3.3.0] - 2026-03-29
 
 ### Added

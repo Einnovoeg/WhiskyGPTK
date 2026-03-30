@@ -299,6 +299,7 @@ public struct BottleSettings: Codable, Equatable {
     static let defaultFileVersion = SemanticVersion(1, 0, 0)
 
     var fileVersion: SemanticVersion = Self.defaultFileVersion
+    private var preset: BottlePreset?
     private var runner: BottleRunner
     private var info: BottleInfo
     private var wineConfig: BottleWineConfig
@@ -307,6 +308,7 @@ public struct BottleSettings: Codable, Equatable {
     private var dosboxConfig: BottleDOSBoxConfig
 
     public init() {
+        self.preset = .windowsGame
         self.runner = .wine
         self.info = BottleInfo()
         self.wineConfig = BottleWineConfig()
@@ -319,6 +321,7 @@ public struct BottleSettings: Codable, Equatable {
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         self.fileVersion = try container.decodeIfPresent(SemanticVersion.self, forKey: .fileVersion) ?? Self.defaultFileVersion
+        self.preset = try container.decodeIfPresent(BottlePreset.self, forKey: .preset)
         self.runner = try container.decodeIfPresent(BottleRunner.self, forKey: .runner) ?? .wine
         self.info = try container.decodeIfPresent(BottleInfo.self, forKey: .info) ?? BottleInfo()
         self.wineConfig = try container.decodeIfPresent(BottleWineConfig.self, forKey: .wineConfig) ?? BottleWineConfig()
@@ -332,6 +335,12 @@ public struct BottleSettings: Codable, Equatable {
     public var bottleRunner: BottleRunner {
         get { runner }
         set { runner = newValue }
+    }
+
+    /// The curated preset last applied to this bottle, if any.
+    public var appliedPreset: BottlePreset? {
+        get { preset }
+        set { preset = newValue }
     }
 
     /// The name of this bottle

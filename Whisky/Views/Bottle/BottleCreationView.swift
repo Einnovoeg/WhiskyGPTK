@@ -22,72 +22,89 @@ import WhiskyKit
 struct BottleCreationView: View {
     @Binding var newlyCreatedBottleURL: URL?
 
-    @State private var newBottleName: String = ""
+    @State private var selectedPreset: BottlePreset = .windowsGame
+    @State private var newBottleName = ""
     @State private var newBottleVersion: WinVersion = .win10
     @State private var newBottleRunner: BottleRunner = .wine
     @State private var newBottleURL: URL = UserDefaults.standard.url(forKey: "defaultBottleLocation")
                                            ?? BottleData.defaultBottleDir
-    @State private var nameValid: Bool = false
+    @State private var nameValid = false
+    @State private var showsAdvancedOverrides = false
 
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
         NavigationStack {
             Form {
-                TextField("create.name", text: $newBottleName)
-                    .onChange(of: newBottleName) { _, name in
-                        nameValid = !name.isEmpty
+                Section("Compatibility Preset") {
+                    Picker("Preset", selection: $selectedPreset) {
+                        ForEach(BottlePreset.allCases) { preset in
+                            Label(preset.displayName, systemImage: preset.systemImage)
+                                .tag(preset)
+                        }
                     }
-                    .help("Choose the library name shown in the sidebar.")
+                    .help("Start from a curated compatibility profile instead of tuning every setting manually.")
+                    .onChange(of: selectedPreset) { _, preset in
+                        applyPreset(preset)
+                    }
 
-                Picker("Runner", selection: $newBottleRunner) {
-                    ForEach(BottleRunner.allCases, id: \.self) { runner in
-                        Label(runner.displayName, systemImage: runner.systemImage)
-                            .tag(runner)
-                    }
-                }
-                .help("Select the runtime family for this library.")
-
-                VStack(alignment: .leading, spacing: 6) {
-                    Text(newBottleRunner == .wine
-                         ? "Use \(WhiskyWineInstaller.currentWineRuntime()?.displayName ?? "the selected Wine runtime") for modern Windows games."
-                         : newBottleRunner.creationSummary)
-                        .font(.subheadline)
-                    if newBottleRunner == .dosbox {
-                        Text("DOSBox libraries scan the DOS Games folder for .exe, .com, and .bat files.")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    } else {
-                        Text(WhiskyWineInstaller.activeWineRuntimeSummary())
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
+                    BottlePresetSummaryCard(preset: selectedPreset)
+                    BottlePresetChecklistView(preset: selectedPreset)
                 }
 
-                Picker("create.win", selection: $newBottleVersion) {
-                    ForEach(WinVersion.allCases.reversed(), id: \.self) {
-                        Text($0.pretty())
-                    }
-                }
-                .disabled(newBottleRunner != .wine)
-                .help(newBottleRunner == .wine
-                      ? "Choose the Windows version reported to apps in this GPTK bottle."
-                      : "DOSBox libraries do not emulate a Windows version.")
+                Section("Library") {
+                    TextField("create.name", text: $newBottleName)
+                        .onChange(of: newBottleName) { _, name in
+                            nameValid = !name.isEmpty
+                        }
+                        .help("Choose the library name shown in the sidebar.")
 
-                ActionView(
-                    text: "create.path",
-                    subtitle: newBottleURL.prettyPath(),
-                    actionName: "create.browse"
-                ) {
-                    let panel = NSOpenPanel()
-                    panel.canChooseFiles = false
-                    panel.canChooseDirectories = true
-                    panel.allowsMultipleSelection = false
-                    panel.canCreateDirectories = true
-                    panel.directoryURL = BottleData.containerDir
-                    panel.begin { result in
-                        if result == .OK, let url = panel.urls.first {
-                            newBottleURL = url
+                    LabeledContent("Runner") {
+                        Label(selectedPreset.runner.displayName, systemImage: selectedPreset.runner.systemImage)
+                    }
+                    .help("The compatibility preset chooses the runner family for this library.")
+
+                    if selectedPreset.runner == .wine {
+                        LabeledContent("Windows Version") {
+                            Text(newBottleVersion.pretty())
+                                .foregroundStyle(.secondary)
+                        }
+                        .help("This preset currently starts from the shown Windows version.")
+                    }
+
+                    ActionView(
+                        text: "settings.path",
+                        subtitle: newBottleURL.prettyPath(),
+                        actionName: "create.browse"
+                    ) {
+                        let panel = NSOpenPanel()
+                        panel.canChooseFiles = false
+                        panel.canChooseDirectories = true
+                        panel.allowsMultipleSelection = false
+                        panel.canCreateDirectories = true
+                        panel.directoryURL = BottleData.containerDir
+                        panel.begin { result in
+                            if result == .OK, let url = panel.urls.first {
+                                newBottleURL = url
+                            }
+                        }
+                    }
+                    .help("Choose where this new library should be created on disk.")
+                }
+
+                Section {
+                    DisclosureGroup("Advanced Overrides", isExpanded: $showsAdvancedOverrides) {
+                        if selectedPreset.runner == .wine {
+                            Picker("Windows Version", selection: $newBottleVersion) {
+                                ForEach(WinVersion.allCases.reversed(), id: \.self) {
+                                    Text($0.pretty())
+                                }
+                            }
+                            .help("Override the preset's starting Windows version for this bottle only.")
+                        } else {
+                            Text("DOS presets intentionally keep advanced tuning in the Config tab so the creation sheet stays compact.")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
                         }
                     }
                 }
@@ -108,23 +125,82 @@ struct BottleCreationView: View {
                     }
                     .keyboardShortcut(.defaultAction)
                     .disabled(!nameValid)
-                    .help("Create the new GPTK Wine bottle or DOSBox library.")
+                    .help("Create the new Wine bottle or DOSBox library using the selected preset.")
                 }
             }
             .onSubmit {
                 submit()
+            }
+            .onAppear {
+                applyPreset(selectedPreset)
+                nameValid = !newBottleName.isEmpty
             }
         }
         .fixedSize(horizontal: false, vertical: true)
         .frame(width: ViewWidth.small)
     }
 
-    func submit() {
-        newlyCreatedBottleURL = BottleVM.shared.createNewBottle(bottleName: newBottleName,
-                                                                winVersion: newBottleVersion,
-                                                                runner: newBottleRunner,
-                                                                bottleURL: newBottleURL)
+    private func applyPreset(_ preset: BottlePreset) {
+        var stagedSettings = BottleSettings()
+        stagedSettings.apply(preset: preset)
+        newBottleRunner = preset.runner
+        if preset.runner == .wine {
+            newBottleVersion = stagedSettings.windowsVersion
+        }
+    }
+
+    private func submit() {
+        newlyCreatedBottleURL = BottleVM.shared.createNewBottle(
+            bottleName: newBottleName,
+            winVersion: newBottleVersion,
+            runner: newBottleRunner,
+            bottleURL: newBottleURL,
+            preset: selectedPreset
+        )
         dismiss()
+    }
+}
+
+struct BottlePresetSummaryCard: View {
+    let preset: BottlePreset
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .top, spacing: 10) {
+                Image(systemName: preset.systemImage)
+                    .foregroundStyle(preset.runner == .wine ? .orange : .green)
+                    .frame(width: 18)
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(preset.summary)
+                        .font(.subheadline)
+                    Text(preset.detail)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    if let recommendedRuntimeSummary = preset.recommendedRuntimeSummary {
+                        Text(recommendedRuntimeSummary)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+        }
+        .padding(.vertical, 4)
+    }
+}
+
+struct BottlePresetChecklistView: View {
+    let preset: BottlePreset
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            ForEach(Array(preset.checklist.enumerated()), id: \.offset) { _, step in
+                Label(step, systemImage: "checkmark.circle")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .padding(.bottom, 4)
     }
 }
 
