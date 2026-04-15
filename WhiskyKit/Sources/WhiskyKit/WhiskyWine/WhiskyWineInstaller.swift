@@ -215,9 +215,16 @@ public class WhiskyWineInstaller {
 
     /// Installs a runtime from either an archive or a local extracted directory.
     ///
-    /// The installer preserves compatible extras such as DXVK and Winetricks so
-    /// runtime upgrades do not silently remove them when the new payload does
-    /// not bundle identical copies.
+    /// The installation process follows these steps:
+    /// 1. Backs up existing "extras" (like DXVK and Winetricks) to a temporary folder.
+    /// 2. Removes the existing runtime library folder to ensure a clean slate.
+    /// 3. Extracts the new runtime payload (via Tar if it's an archive).
+    /// 4. Applies any available local redist overlays (custom library overrides).
+    /// 5. Restores the backed-up extras into the new runtime.
+    /// 6. Saves the installation version and source metadata.
+    ///
+    /// If any step fails, the installer attempts to restore the backed-up extras
+    /// to avoid leaving the user with a broken installation.
     @discardableResult
     public static func install(
         from archiveURL: URL,
@@ -362,6 +369,12 @@ public class WhiskyWineInstaller {
 
     /// Detects a directly usable local GPTK runtime on disk, including mounted
     /// volumes that expose `Game Porting Toolkit.app` outside `/Applications`.
+    ///
+    /// The search order is:
+    /// 1. Environment variable `WHISKY_GPTK_LOCAL_RUNTIME_PATH`.
+    /// 2. Known local candidate paths (e.g., `/Applications/Game Porting Toolkit.app`).
+    /// 3. Root-level search of all mounted volumes in `/Volumes`.
+    /// 4. Deep nested search in `/Volumes` for any directory named `Game Porting Toolkit.app`.
     public static func localRuntimePackage() -> RuntimePackage? {
         if let environmentPath = ProcessInfo.processInfo.environment["WHISKY_GPTK_LOCAL_RUNTIME_PATH"] {
             let candidate = URL(fileURLWithPath: environmentPath)
@@ -740,6 +753,11 @@ public class WhiskyWineInstaller {
         return nil
     }
 
+    /// Recursively searches for directories with a specific name within a root directory,
+    /// limiting the search depth to prevent excessive filesystem traversal.
+    ///
+    /// This is used to find GPTK runtimes or redist folders that may be buried within
+    /// complex disk image structures.
     private static func discoverNestedDirectories(named name: String, in root: URL, maxDepth: Int) -> [URL] {
         guard let enumerator = FileManager.default.enumerator(
             at: root,

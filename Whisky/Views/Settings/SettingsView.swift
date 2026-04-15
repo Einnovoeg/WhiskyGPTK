@@ -182,10 +182,16 @@ struct SettingsView: View {
                     VStack(alignment: .leading, spacing: 4) {
                         Text(ProjectInfo.displayName)
                             .font(.title3.weight(.semibold))
-                        Text("Version \(appVersionSummary)")
+                        Text(String(
+                            localized: "settings.general.version",
+                            defaultValue: "Version \(appVersionSummary)"
+                        ))
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
-                        Text("Runtime \(activeWineSummary)")
+                        Text(String(
+                            localized: "settings.general.runtime",
+                            defaultValue: "Runtime \(activeWineSummary)"
+                        ))
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
@@ -265,11 +271,15 @@ struct SettingsView: View {
                 .help("Apply Whisky GPTK styling when generating macOS shortcuts.")
             }
 
-            Section("Notes") {
-                Text("Keep glass effects off if you want the quietest, most traditional window appearance.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
+                Section("Notes") {
+                    Text(String(
+                        localized: "settings.appearance.notes",
+                        defaultValue: "Keep glass effects off if you want the quietest, most traditional window appearance."
+                    ))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
         }
         .formStyle(.grouped)
     }
@@ -281,10 +291,16 @@ struct SettingsView: View {
                     Text(systemScanReport?.summary ?? "Scanning this Mac...")
                         .font(.subheadline)
 
-                    Text("Active Wine: \(systemScanReport?.activeWineSummary ?? activeWineSummary)")
+                    Text(String(
+                        localized: "settings.runners.scan.title",
+                        defaultValue: "Active Wine: \(systemScanReport?.activeWineSummary ?? activeWineSummary)"
+                    ))
                         .font(.caption)
                         .foregroundStyle(.secondary)
-                    Text("DOSBox: \(systemScanReport?.dosboxSummary ?? dosboxVersionSummary)")
+                    Text(String(
+                        localized: "settings.runners.scan.dosbox",
+                        defaultValue: "DOSBox: \(systemScanReport?.dosboxSummary ?? dosboxVersionSummary)"
+                    ))
                         .font(.caption)
                         .foregroundStyle(.secondary)
 
@@ -314,7 +330,7 @@ struct SettingsView: View {
                         .disabled(isRefreshingRunners || isManagingWineRuntime || isManagingDOSBox)
                         .help("Scan this Mac and summarize which runner components still need attention.")
 
-                        Button("Apply Recommended Defaults") {
+                        Button(String(localized: "settings.runners.scan.applyDefaults", defaultValue: "Apply Recommended Defaults")) {
                             applyRecommendedDefaults()
                             Task {
                                 await refreshRunnerStatus()
@@ -348,9 +364,19 @@ struct SettingsView: View {
                     .foregroundStyle(.secondary)
 
                 if runtimeSelection == .gptkManaged {
-                    Text("Managed GPTK runtime: \(managedRuntimeSummary)")
+                    Text(String(
+                        localized: "settings.runners.managedRuntime",
+                        defaultValue: "Managed GPTK runtime: \(managedRuntimeSummary)"
+                    ))
                         .font(.caption)
                         .foregroundStyle(.secondary)
+                    Text(String(
+                        localized: "settings.runners.managedRuntime.info",
+                        defaultValue: "GPTK installs and updates stay on the Updates tab so runner selection stays focused."
+                    ))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+
 
                     Text("GPTK installs and updates stay on the Updates tab so runner selection stays focused.")
                         .font(.caption)
@@ -410,7 +436,7 @@ struct SettingsView: View {
                 }
                 .help("Point Whisky GPTK at a specific DOSBox or DOSBox Staging binary.")
 
-                Button("Use Auto-Detected DOSBox") {
+                Button(String(localized: "settings.runners.dosbox.autoDetect", defaultValue: "Use Auto-Detected DOSBox")) {
                     DOSBox.setOverrideExecutableURL(nil)
                     Task {
                         await refreshRunnerStatus()
@@ -421,9 +447,10 @@ struct SettingsView: View {
 
             Section("Runner Notes") {
                 Text(
-                    "Wine 11 stable is now available as a selectable macOS runtime. "
-                    + "DOSBox Staging can be installed and updated from here. "
-                    + "Lutris itself is Linux-first, so this app follows the same launcher idea with native macOS runners instead of exposing a fake Lutris runtime."
+                    String(
+                        localized: "settings.runners.notes",
+                        defaultValue: "Wine 11 stable is now available as a selectable macOS runtime. DOSBox Staging can be installed and updated from here. Lutris itself is Linux-first, so this app follows the same launcher idea with native macOS runners instead of exposing a fake Lutris runtime."
+                    )
                 )
                     .font(.caption)
                     .foregroundStyle(.secondary)

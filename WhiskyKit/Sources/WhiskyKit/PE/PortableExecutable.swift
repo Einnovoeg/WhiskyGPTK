@@ -67,7 +67,8 @@ public struct PEFile: Hashable, Equatable, Sendable {
             try? fileHandle.close()
         }
 
-        // (0x3C) Pointer to PE Header
+        // The PE format starts with a DOS stub. At offset 0x3C (60 bytes), there is a 4-byte
+        // pointer to the start of the actual PE header.
         guard let peOffset = fileHandle.extract(UInt32.self, offset: 0x3C) else {
             throw PEError.invalidPEFile
         }
@@ -75,13 +76,13 @@ public struct PEFile: Hashable, Equatable, Sendable {
         guard let peHeader = fileHandle.extract(UInt32.self, offset: offset) else {
             throw PEError.invalidPEFile
         }
-        // Check signature ("PE\0\0")
+        // The PE header must start with the signature "PE\0\0" (0x50450000 in little-endian).
         guard peHeader.bigEndian == 0x50450000 else {
             throw PEError.invalidPEFile
         }
 
         let coffFileHeader = COFFFileHeader(handle: fileHandle, offset: offset)
-        offset += 24 // Size of COFFHeader
+        offset += 24 // Size of COFFHeader is 20 bytes + 4 bytes for the "PE\0\0" signature.
         self.coffFileHeader = coffFileHeader
 
         if coffFileHeader.sizeOfOptionalHeader > 0 {
@@ -96,7 +97,7 @@ public struct PEFile: Hashable, Equatable, Sendable {
             if let section = Section(handle: fileHandle, offset: offset) {
                 sections.append(section)
             }
-            offset += 40 // Size of Section
+            offset += 40 // Each section header is exactly 40 bytes.
         }
         self.sections = sections
     }
@@ -120,6 +121,7 @@ public struct PEFile: Hashable, Equatable, Sendable {
     ///   - types: Only read entrys of the given types. Only applies to the root table. Default includes all types.
     /// - Returns: The resource table section
     private func rsrc(handle: FileHandle, types: [ResourceType] = ResourceType.allCases) -> ResourceDirectoryTable? {
+
         if let resourceSection = sections.first(where: { $0.name == ".rsrc" }) {
             return ResourceDirectoryTable(
                 handle: handle,
@@ -153,11 +155,16 @@ public struct PEFile: Hashable, Equatable, Sendable {
             try? handle.close()
         }
 
+        // Search the resource section (.rsrc) specifically for RT_ICON (type 3).
         guard let rsrc = rsrc(handle: handle, types: [.icon]) else { return nil }
         let icons = rsrc.allEntries
             .compactMap { entry -> NSImage? in
+                // Resolve the Relative Virtual Address (RVA) to a physical file offset.
                 guard let offset = entry.resolveRVA(sections: sections) else { return nil }
                 let bitmapInfo = BitmapInfoHeader(handle: handle, offset: UInt64(offset))
+                
+                // If the bitmap header size is not the standard 40 bytes, it's likely a 
+                // raw image representation that we can attempt to load directly.
                 if bitmapInfo.size != 40 {
                     do {
                         try handle.seek(toOffset: UInt64(offset))
@@ -172,6 +179,7 @@ public struct PEFile: Hashable, Equatable, Sendable {
                         print("Failed to get icon")
                     }
                 } else if bitmapInfo.colorFormat != .unknown {
+                    // For standard bitmaps, we use the custom renderer to decode the bits.
                     return bitmapInfo.renderBitmap(handle: handle, offset: UInt64(offset + bitmapInfo.size))
                 }
 
@@ -179,6 +187,7 @@ public struct PEFile: Hashable, Equatable, Sendable {
             }
             .filter { $0.isValid }
 
+        // Return the largest available icon to ensure high quality on Retina displays.
         if !icons.isEmpty {
             return icons.max(by: { $0.size.height < $1.size.height })
         } else {

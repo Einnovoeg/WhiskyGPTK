@@ -248,7 +248,10 @@ private struct BottleHeaderView: View {
                 VStack(alignment: .leading, spacing: 6) {
                     Text(bottle.settings.name)
                         .font(.system(size: 28, weight: .bold, design: .rounded))
-                    Text("Manage this \(bottle.runner.displayName.lowercased()) library and its installed software.")
+                    Text(String(
+                        localized: "bottle.overview.subtitle",
+                        defaultValue: "Manage this \(bottle.runner.displayName.lowercased()) library and its installed software."
+                    ))
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                     Text(bottle.url.path(percentEncoded: false))
@@ -298,16 +301,18 @@ private struct BottleHeaderView: View {
                                 }
                                 .disabled(!WhiskyWineInstaller.hasWinetricksRuntime())
                             } else {
-                                Button("Open Config File", systemImage: "doc.text") {
-                                    NSWorkspace.shared.open(bottle.dosboxConfigURL)
-                                }
+                                 Button(String(localized: "button.openConfigFile", defaultValue: "Open Config File"), systemImage: "doc.text") {
+                                     NSWorkspace.shared.open(bottle.dosboxConfigURL)
+                                 }
+
                             }
 
                             Divider()
 
-                            Button("Show in Finder", systemImage: "folder.badge.gearshape") {
-                                NSWorkspace.shared.activateFileViewerSelecting([bottle.url])
-                            }
+                                 Button(String(localized: "button.showInFinder", defaultValue: "Show in Finder"), systemImage: "folder.badge.gearshape") {
+                                     NSWorkspace.shared.activateFileViewerSelecting([bottle.url])
+                                 }
+
                         } label: {
                             Label("Library", systemImage: "ellipsis.circle")
                         }
@@ -409,13 +414,17 @@ private struct OverviewMetricsSection: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Overview")
-                    .font(.headline)
-                Text("Core compatibility and runtime settings for this library.")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-            }
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(String(localized: "bottle.overview.title", defaultValue: "Overview"))
+                        .font(.headline)
+                    Text(String(
+                        localized: "bottle.overview.subtitle",
+                        defaultValue: "Core compatibility and runtime settings for this library."
+                    ))
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+
 
             LazyVGrid(columns: metricGrid, alignment: .leading, spacing: 12) {
                 if bottle.runner == .wine {
@@ -481,19 +490,26 @@ private struct PinnedProgramsSection: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             VStack(alignment: .leading, spacing: 4) {
-                Text("Quick Launch")
+                Text(String(localized: "bottle.pinned.title", defaultValue: "Quick Launch"))
                     .font(.headline)
-                Text("Pin installed programs here for one-click launch.")
+                Text(String(
+                    localized: "bottle.pinned.subtitle",
+                    defaultValue: "Pin installed programs here for one-click launch."
+                ))
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
             }
 
             if bottle.pinnedPrograms.isEmpty {
-                ContentUnavailableView(
-                    "No Pinned Programs",
-                    systemImage: "pin.slash",
-                    description: Text("Add a program to keep your most-used launchers in one place.")
-                )
+                    ContentUnavailableView(
+                        String(localized: "bottle.pinned.none", defaultValue: "No Pinned Programs"),
+                        systemImage: "pin.slash",
+                        description: Text(String(
+                            localized: "bottle.pinned.none.description",
+                            defaultValue: "Add a program to keep your most-used launchers in one place."
+                        ))
+                    )
+
                 .frame(maxWidth: .infinity)
             }
 

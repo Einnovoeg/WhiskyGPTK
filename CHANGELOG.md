@@ -4,7 +4,18 @@ All notable changes to this project will be documented in this file.
 
 The format is loosely based on Keep a Changelog and versioned with Semantic Versioning.
 
-## [Unreleased]
+## [3.4.1] - 2026-04-15
+
+### Added
+- Added detailed inline documentation and architectural comments to critical components (`WhiskyWineInstaller` and `PortableExecutable`).
+- Localized key UI strings in `BottleView` and `SettingsView` to support future translation and a more professional user experience.
+
+### Changed
+- Consolidated redundant GitHub repositories into a single maintained source.
+- Removed all personal information and hardcoded user paths from the codebase.
+
+### Fixed
+- Fixed a trailing whitespace violation in `PortableExecutable.swift`.
 
 ## [3.4.0] - 2026-03-29
 
